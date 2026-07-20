@@ -9,17 +9,17 @@ alias \
 # Tmux to enable colorscheme
 alias tmux="TERM=screen-256color-bce tmux"
 
-# alias to have RANGER move the current directory
-#alias lf='. ranger'
-
 #custom commands
 alias \
 	src="grep -rn '.' -e " \
 	srcw="grep -rnw '.' -e " \
 	ksp='cd .steam/root/steamapps/common/Kerbal\ Space\ Program/ && taskset -c 0,2,4 ./KSP.x86_64'
 
-# clear tmux-history with clear
-alias clear="tmux clear-history | clear"
+# clear tmux history along with the screen when inside tmux; plain clear otherwise.
+clear() {
+    [ -n "$TMUX" ] && tmux clear-history
+    command clear
+}
 
 #ESA-microProp aliases
 alias dl='cd $HOME/Nextcloud/workspaceC/ESA-Prop-Software/datalogger/'
@@ -41,6 +41,3 @@ alias pmake='time nice make -j$NUMCPUS --load-average=$NUMCPUS'
 
 
 alias docs='cd $HOME/docs/'
-
-#alias to substitute a world in all files in the current directory
-# find /var/www -type f -exec sed -i 's/privelages/privileges/g' {} \;

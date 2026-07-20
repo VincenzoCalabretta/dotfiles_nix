@@ -16,10 +16,19 @@
   # with the nixpkgs branch pinned in flake.nix.
   home.stateVersion = "24.11";
 
+  # Puts tmux/i3 helper scripts (tmux-sessionizer, randr_toggle_displays.py, …)
+  # on PATH so config files can invoke them by bare name.
+  home.sessionPath = [ "$HOME/.config/tmux/scripts" ];
+
   programs.home-manager.enable = true;
 
-  # Packages that don't belong to a specific tool module.
-  # Tool-specific runtime deps live next to their module.
+  # Home-manager sets up the zsh hook and pulls in nix-direnv automatically.
+  programs.direnv = {
+    enable = true;
+    nix-direnv.enable = true;
+  };
+
+  # Shared base packages. Tool-specific runtime deps live in their module.
   home.packages = with pkgs; [
     # Shell / terminal essentials
     ripgrep
@@ -35,7 +44,6 @@
     wget
     curl
     xclip
-    xsel
 
     # Fonts (nvim, terminals, i3 all expect a Nerd Font)
     nerd-fonts.jetbrains-mono
@@ -46,9 +54,6 @@
     gnumake
     pkg-config
     git
-
-    # Direnv (used from zshrc)
-    direnv
   ];
 
   fonts.fontconfig.enable = true;

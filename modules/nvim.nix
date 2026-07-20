@@ -4,18 +4,13 @@
   home.packages = with pkgs; [
     neovim
 
-    # Build deps for lazy.nvim / telescope-fzf-native / treesitter
-    gcc
-    gnumake
+    # Build deps for lazy.nvim / telescope-fzf-native / treesitter.
+    # gcc, gnumake, git, unzip are shared (see home.nix).
     cmake
     tree-sitter
     nodejs
-    unzip
-    git
 
-    # Runtime tools used by plugins
-    ripgrep
-    fd
+    # ripgrep + fd are shared (see home.nix).
 
     # LSPs / formatters listed in plugins/lsp.lua ensure_installed
     lua-language-server

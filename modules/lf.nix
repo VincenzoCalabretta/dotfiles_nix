@@ -3,11 +3,8 @@
 {
   home.packages = with pkgs; [
     lf
-    # lfrc uses these external commands
-    file
-    unzip
-    unrar
-    p7zip
+    # lfrc uses these external commands.
+    # file, unzip, unrar, p7zip are shared (see home.nix).
     gnutar
     gzip
     xz

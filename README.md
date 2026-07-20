@@ -66,7 +66,7 @@ home-manager switch --flake ~/dotfiles-nix#v
 
 If you want live edits without rebuild, swap `xdg.configFile.<x>.source =
 ../dotfiles/<x>;` for
-`xdg.configFile.<x>.source = config.lib.file.mkOutOfStoreSymlink "/home/v/dotfiles-nix/dotfiles/<x>";`
+`xdg.configFile.<x>.source = config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/dotfiles-nix/dotfiles/<x>";`
 in the relevant module.
 
 ## What is NOT covered here

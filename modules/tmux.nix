@@ -5,9 +5,8 @@
     tmux
     # tmux.conf and scripts reference these:
     python3        # randr_toggle_displays.py popup
-    xclip          # copy-mode-vi y -> xclip
-    fzf            # tmux-sessionizer picker
     xrandr         # display switch script
+    # xclip + fzf are shared (see home.nix).
   ];
 
   # tmux.conf sources ~/.config/tmux/tmux.conf and the scripts dir directly,

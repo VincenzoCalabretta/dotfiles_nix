@@ -8,11 +8,7 @@
 {
   home.packages = with pkgs; [
     zsh
-    direnv
-    # tools the zshrc references
-    git
-    tmux
-    neovim
+    # git, tmux, neovim, direnv are provided by home.nix / other modules.
   ];
 
   home.file.".zshrc".source = ../dotfiles/zsh/zshrc;
