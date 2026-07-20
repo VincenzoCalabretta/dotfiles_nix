@@ -1,92 +1,87 @@
 # dotfiles-nix
 
-Home-manager flake for `v`'s core CLI/dev environment: **tmux, neovim, zsh
-(oh-my-zsh), lf, i3**. Configs are shipped as verbatim files — no rewrite into
-Nix — and the flake pulls in every runtime dependency the configs reference.
+Home-manager flake for tmux, neovim, zsh (oh-my-zsh), lf, i3.
+Configs are shipped verbatim from `dotfiles/**` — no rewrite into Nix.
+Modules provide every runtime dependency the configs reference.
 
 ## Layout
 
 ```
-flake.nix          # inputs: nixpkgs + home-manager
-home.nix           # top-level HM config (shared packages, imports modules)
+flake.nix          # inputs: nixpkgs (unstable) + home-manager
+home.nix           # shared packages, programs.direnv, sessionPath, module imports
 modules/
-  tmux.nix         # tmux + xclip + fzf + python + xrandr, symlinks ~/.config/tmux
-  nvim.nix         # neovim + LSPs + build deps, symlinks ~/.config/nvim
-  zsh.nix          # zsh + oh-my-zsh + plugins, symlinks ~/.zshrc + ~/.config/zsh
-  lf.nix           # lf + archive tools + xdg-utils + mimeopen, symlinks ~/.config/lf
-  i3.nix           # i3 companions (dmenu, i3status, rofi, alacritty…), symlinks ~/.config/i3
-dotfiles/          # verbatim copies of the source configs
-  tmux/ nvim/ zsh/ lf/ i3/
+  tmux.nix         # tmux + python3 + xrandr           → ~/.config/tmux
+  nvim.nix         # neovim + LSPs + build deps        → ~/.config/nvim
+  zsh.nix          # zsh + oh-my-zsh + plugins         → ~/.zshrc, ~/.config/zsh
+  lf.nix           # lf + archive tools + mimeopen     → ~/.config/lf
+  i3.nix           # dmenu, i3status, rofi, alacritty… → ~/.config/i3
+dotfiles/          # verbatim source configs (tmux/ nvim/ zsh/ lf/ i3/)
 ```
 
-## First-time setup on a fresh NixOS install
+`home.sessionPath` prepends `~/.config/tmux/scripts` so helpers
+(`tmux-sessionizer`, `randr_toggle_displays.py`, `tmux-cht.sh`, …) resolve
+by bare name from tmux/i3 bindings.
 
-1. **System-level i3** — enable i3 as a window manager in your NixOS
-   `configuration.nix` (this cannot be done from home-manager alone). Your
-   existing `~/.config/nixos/configuration.nix` already has
-   `services.xserver.windowManager.i3.enable = true;` — reuse it.
+## Activate on a new machine
 
-2. **Clone this repo** somewhere durable, e.g.:
-   ```sh
-   git clone <this-repo-url> ~/dotfiles-nix
-   cd ~/dotfiles-nix
-   ```
+Prerequisites: NixOS with flakes enabled (`nix.settings.experimental-features = [ "nix-command" "flakes" ];`)
+and, if you use i3, `services.xserver.windowManager.i3.enable = true;` in
+`/etc/nixos/configuration.nix` — home-manager cannot enable a WM.
 
-3. **Apply the home-manager configuration** (no need to install home-manager
-   separately — this uses the flake's pinned version):
-   ```sh
-   nix run github:nix-community/home-manager -- switch --flake .#v
-   ```
+```sh
+git clone ssh://git@10.10.0.101/v/dotfiles_nix.git ~/dotfiles-nix
+cd ~/dotfiles-nix
 
-   Later rebuilds:
-   ```sh
-   home-manager switch --flake ~/dotfiles-nix#v
-   ```
+# First activation. -b backup renames any pre-existing conflicting file
+# (~/.zshrc, ~/.config/{nvim,tmux,i3,lf,zsh}, …) to <name>.backup before
+# symlinking. Drop -b backup on a truly empty $HOME.
+nix run github:nix-community/home-manager -- switch -b backup --flake .#v
 
-4. **Set zsh as your login shell** (once):
-   ```sh
-   chsh -s $(which zsh)
-   ```
+chsh -s "$(which zsh)"   # once, if zsh isn't your login shell
+```
 
-5. **Neovim first launch** — `lazy.nvim` will bootstrap and install every
-   plugin listed in `dotfiles/nvim/lua/plugins/*.lua`, pinned via the
-   `lazy-lock.json` also copied into the repo. Mason will pick up LSPs from
-   nixpkgs (also installed via `modules/nvim.nix`), no Mason install needed.
-
-6. **tmux prefix reload** — inside tmux: `prefix + r` reloads the config.
-
-## Editing configs
-
-Since files are copied into `/nix/store` at build time, edits to
-`dotfiles/**` require a rebuild to take effect:
+Later rebuilds (home-manager is on PATH after the first activation):
 
 ```sh
 home-manager switch --flake ~/dotfiles-nix#v
 ```
 
-If you want live edits without rebuild, swap `xdg.configFile.<x>.source =
-../dotfiles/<x>;` for
-`xdg.configFile.<x>.source = config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/dotfiles-nix/dotfiles/<x>";`
-in the relevant module.
+First `nvim` launch bootstraps `lazy.nvim` against `dotfiles/nvim/lazy-lock.json`.
+LSPs come from nixpkgs (`modules/nvim.nix`), not Mason. Inside tmux, `prefix + r`
+reloads the tmux config without a rebuild.
 
-## What is NOT covered here
+## Editing configs
 
-- **NixOS system config** (kernel, drivers, display manager, i3 enable, nvidia,
-  docker, etc.) — lives in `/etc/nixos/configuration.nix`.
-- **Terminals** (alacritty/ghostty/kitty configs). Only `alacritty` binary is
-  installed here (referenced by i3). Add a `modules/alacritty.nix` if you want
-  to ship its config too — the pattern is identical to `modules/lf.nix`.
-- **Non-Nix package managers** referenced by `.zshrc` (`.cargo/bin`, `.bun`,
-  `.dotnet/tools`, `.opencode`, juliaup, pipx). Install those separately as
-  needed; the PATH exports in `.zprofile`/`.zshrc` will pick them up if the
-  directories exist.
+Files are copied into `/nix/store` at build time — edits to `dotfiles/**`
+require `home-manager switch` to take effect. For live edits without rebuild,
+swap the module's
 
-## Notes on config edits vs. Arch
+```nix
+xdg.configFile."<x>".source = ../dotfiles/<x>;
+```
 
-The original `.zshrc` sourced
-`/usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh`,
-an Arch-specific hardcoded path. It has been commented out in
-`dotfiles/zsh/zshrc` — `zsh-syntax-highlighting` is now provided by
-`pkgs.zsh-syntax-highlighting` and loaded by oh-my-zsh via the
-`plugins=(… zsh-syntax-highlighting)` list, symlinked into
-`~/.config/zsh/custom/plugins/zsh-syntax-highlighting/`.
+for
+
+```nix
+xdg.configFile."<x>".source =
+  config.lib.file.mkOutOfStoreSymlink
+    "${config.home.homeDirectory}/dotfiles-nix/dotfiles/<x>";
+```
+
+## Out of scope
+
+- **NixOS system config** (kernel, drivers, display manager, i3 enable,
+  nvidia, docker) — lives in `/etc/nixos/configuration.nix`.
+- **Terminal emulator configs** — only the `alacritty` binary is installed
+  (i3 launches it). Add a `modules/alacritty.nix` to ship its config;
+  pattern is identical to `modules/lf.nix`.
+- **Non-Nix toolchains** referenced from `zshrc`/`zprofile`: `.cargo/bin`,
+  `.bun`, `.dotnet/tools`, `.opencode`, juliaup, pipx, perl5. Install
+  separately; the PATH exports pick them up if the directories exist.
+
+## Arch → NixOS notes
+
+`zsh-syntax-highlighting` was originally sourced from `/usr/share/zsh/plugins/…`
+(Arch). It is now provided by `pkgs.zsh-syntax-highlighting` and loaded via
+oh-my-zsh's `plugins=(… zsh-syntax-highlighting)` list, symlinked into
+`~/.config/zsh/custom/plugins/zsh-syntax-highlighting/` by `modules/zsh.nix`.
