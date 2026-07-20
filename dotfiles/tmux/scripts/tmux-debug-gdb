@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+
+CACHED_MPATH="$HOME/.local/state/tmux/makefile_path"
+mkdir -p "$(dirname "$CACHED_MPATH")"
+
+# -----------------------------------------------------------------------------
+# Check if a Makefile exists in the current directory
+
+echo "$(pwd)"
+
+if [ -f "Makefile" ]; then
+	echo "Makefile found in the current path"
+	MAKEFILE_PATH="."
+else
+	echo "Makefile has not been found in the current path"
+	# Check if the file exists
+	if [ -f $CACHED_MPATH ]; then
+		# Read the content of the file
+		content=$(<"$CACHED_MPATH")
+		# Check if the content contains a valid path
+		if [ -e "$content" ]; then
+			#valid
+			echo "The state file contains a valid path to an existing makefile: $content"
+			MAKEFILE_PATH=$content
+		else
+			#invalid
+			echo "The state file does not contain a valid path to an existing makefile."
+			exit
+		fi
+	else
+		echo "State file does not exist."
+		exit
+	fi
+
+fi
+
+#cd to the makefile path
+cd $MAKEFILE_PATH
+#save the current path
+echo "$(pwd)" > $CACHED_MPATH
+printf "\n---- Executing Makefile ----\n\n"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+
+# print output of make all to a temporary file
+make kill_qemu
+#if a session named dbg exists destroy it
+tmux kill-session -t dbg
+
+make all 2>&1 | grep --color=always -E 'Error|error|$'
+
+tmux new-session -d -s dbg -n gdbp "/usr/bin/zsh -c \"make gdb_host_r5 \""
+tmux split-window -h -t dbg:gdbp '/usr/bin/zsh -c "touch uart_host.log && tail -f uart_host.log;read"'
+tmux split-window -v -t dbg:gdbp '/usr/bin/zsh -c "touch uart_remote.log && tail -f uart_remote.log;read"'
+tmux new-window -n qemu -t dbg:0 "/usr/bin/zsh -c \"make qemu \""
+tmux select-pane -t gdbp.0
+
+tmux select-window -t dbg:gdbp
+tmux set-window-option -g monitor-activity on
+
+i3-msg 'workspace 4; exec alacritty -e tmux attach -t dbg'

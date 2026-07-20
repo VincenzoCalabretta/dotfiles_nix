@@ -1,0 +1,7 @@
+export PATH=$HOME/bin:/usr/local/bin:$PATH
+export PATH="$PATH:$HOME/.cargo/bin"
+export PATH="$PATH:$HOME/julia-1.10.1/bin/"
+export PATH="$PATH:/tools/Xilinx/Vitis/2022.1/bin"
+
+# Created by `pipx` on 2026-06-14 20:35:39
+export PATH="$PATH:/home/v/.local/bin"

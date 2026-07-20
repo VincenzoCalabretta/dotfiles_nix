@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+
+CACHED_MPATH="$HOME/.local/state/tmux/makefile_path"
+
+# -----------------------------------------------------------------------------
+# Check if a Makefile exists in the current directory
+
+echo "$(pwd)"
+
+if [ -f "Makefile" ]; then
+	echo "Makefile found in the current path"
+	MAKEFILE_PATH="."
+else
+	echo "Makefile has not been found in the current path"
+	# Check if the file exists
+	if [ -f $CACHED_MPATH ]; then
+		content=$(<"$CACHED_MPATH")
+		if [ -e "$content" ]; then
+			echo "The state file contains a valid path to an existing makefile: $content"
+			MAKEFILE_PATH=$content
+		else
+			echo "The state file does not contain a valid path to an existing makefile."
+			exit
+		fi
+	else
+		echo "State file does not exist."
+		exit
+	fi
+fi
+
+#cd to the makefile path
+cd $MAKEFILE_PATH
+#save the current path
+echo "$(pwd)" > $CACHED_MPATH
+printf "\n---- Executing Makefile ----\n\n"
+
+make kill_qemu
+tmux kill-session -t dbg
+
+make clean 2>&1 | grep --color=always -E 'Error|error|$'
+make all 2>&1 | grep --color=always -E 'Error|error|$'

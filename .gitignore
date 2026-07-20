@@ -1,0 +1,8 @@
+result
+result-*
+.direnv/
+
+# Nvim / Python / macOS junk that shouldn't be tracked
+__pycache__/
+*.pyc
+.DS_Store

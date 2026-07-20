@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+
+# Helper logging function
+log() {
+    echo "[tmux-sessionizer] $1" >> "/tmp/tmux-sessionizer.log"
+}
+
+if [[ $# -eq 1 ]]; then
+    selected=$1
+else
+    selected=$(find -L ~/projects ~/.config -mindepth 1 -maxdepth 1 -type d | fzf)
+fi
+
+if [[ -z $selected ]]; then
+    exit 0
+fi
+
+selected_basename=$(basename "$selected" | tr . _)
+selected_dir=$(basename "$(dirname "$selected")" | tr . _)
+separator="--"
+selected_name="${selected_dir}${separator}${selected_basename}"
+
+# Sanitize session name for tmux
+selected_name=$(echo "$selected_name" | tr -c 'A-Za-z0-9_' '_')
+
+# If session doesn't exist, create it
+if ! tmux has-session -t "$selected_name" 2>/dev/null; then
+    tmux new-session -ds "$selected_name" -c "$selected"
+
+    # ---------------------------------------------------------
+    # Direnv / Nix Environment Hydration
+    # ---------------------------------------------------------
+    if [[ -f "$selected/.envrc" ]]; then
+        log "Found .envrc in $selected. Hydrating session '$selected_name'..."
+        
+        # We use python to parse the JSON and generate tmux commands
+        # This ensures we handle complex strings/escaping correctly
+        direnv_cmds=$(cd "$selected" && direnv export json 2>/dev/null | python3 -c "
+import sys, json, shlex
+try:
+    data = json.load(sys.stdin)
+    # Block list of vars we do NOT want to overwrite from the user's shell
+    ignore = {'PWD', 'OLDPWD', 'SHELL', 'TMUX', 'SHLVL', '_'}
+    
+    for k, v in data.items():
+        if k not in ignore and v is not None:
+            # Escape the value for shell safety
+            val = shlex.quote(v)
+            print(f'tmux set-environment -t \"$selected_name\" {k} {val}')
+except Exception as e:
+    pass
+")
+        
+        if [[ -n "$direnv_cmds" ]]; then
+            # Execute the generated tmux commands
+            eval "$direnv_cmds"
+            log "Hydration complete."
+            
+            # OPTIONAL: Set DIRENV_LOG_FORMAT to empty to suppress 'direnv: loading' noise
+            tmux set-environment -t "$selected_name" DIRENV_LOG_FORMAT ""
+        else
+            log "Failed to export direnv data."
+        fi
+    fi
+    # ---------------------------------------------------------
+fi
+
+if [[ -z $TMUX ]]; then
+    # not inside tmux → attach
+    tmux attach -t "$selected_name"
+else
+    # already inside tmux → switch
+    tmux switch-client -t "$selected_name"
+fi

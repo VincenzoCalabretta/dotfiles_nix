@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+SCRIPT_DIR="$HOME/.config/tmux/scripts"
+
+"$SCRIPT_DIR/tmux-windowizer" client      
+"$SCRIPT_DIR/tmux-windowizer" server      
+
+branch_name=$(basename $1)
+"$SCRIPT_DIR/tmux-windowizer" client cd $branch_name
+"$SCRIPT_DIR/tmux-windowizer" client ./tvui client
+
+"$SCRIPT_DIR/tmux-windowizer" server cd $branch_name
+"$SCRIPT_DIR/tmux-windowizer" server ./tvui server

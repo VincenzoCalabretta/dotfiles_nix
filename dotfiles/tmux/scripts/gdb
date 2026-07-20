@@ -1,0 +1,21 @@
+#include <rtems/stackchk.h>
+
+static bool stack_checker_once;
+
+static void fatal_extension(
+  rtems_fatal_source source,
+  bool               always_set_to_false,
+  rtems_fatal_code   code
+)
+{
+  (void) source;
+  (void) always_set_to_false;
+  (void) code;
+
+  if (!stack_checker_once) {
+    stack_checker_once = true;
+    rtems_stack_checker_report_usage();
+  }
+}
+
+#define CONFIGURE_INITIAL_EXTENSIONS { .fatal = fatal_extension, .thread_switch = mpu_stack_prot_switch } 
