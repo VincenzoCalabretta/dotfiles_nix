@@ -7,6 +7,8 @@
     ./modules/zsh.nix
     ./modules/lf.nix
     ./modules/i3.nix
+    ./modules/ghostty.nix
+    ./modules/opencode.nix
   ];
 
   home.username = "v";
@@ -44,6 +46,7 @@
     wget
     curl
     xclip
+    htop
 
     # Fonts (nvim, terminals, i3 all expect a Nerd Font)
     nerd-fonts.jetbrains-mono
@@ -57,6 +60,11 @@
     gnumake
     pkg-config
     git
+
+    # Programs
+    keepassxc
+    codex
+    claude-code
   ];
 
   fonts.fontconfig.enable = true;

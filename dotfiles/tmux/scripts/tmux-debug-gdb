@@ -59,4 +59,4 @@ tmux select-pane -t gdbp.0
 tmux select-window -t dbg:gdbp
 tmux set-window-option -g monitor-activity on
 
-i3-msg 'workspace 4; exec alacritty -e tmux attach -t dbg'
+i3-msg 'workspace 4; exec ghostty -e tmux attach -t dbg'

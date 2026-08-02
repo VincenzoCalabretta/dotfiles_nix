@@ -37,7 +37,7 @@ for_window [class="^.*"] client.focused          #77dd77 #285577 #ffffff #2e9ef4
 floating_modifier $mod
 
 # start a terminal
-bindsym $mod+Return exec alacritty
+bindsym $mod+Return exec ghostty
 
 # kill focused window
 bindsym $mod+q kill
@@ -70,9 +70,9 @@ bindsym $mod+Shift+Up move up
 bindsym $mod+Shift+Right move right
 
 # split in horizontal orientation
-bindsym $mod+z split h; exec alacritty
+bindsym $mod+z split h; exec ghostty
 # split in vertical orientation
-bindsym $mod+x split v; exec alacritty
+bindsym $mod+x split v; exec ghostty
 
 # enter fullscreen mode for the focused container
 bindsym $mod+g fullscreen toggle
@@ -154,8 +154,8 @@ bar {
 # ------------------------------------------
 # CUSTOM WORKSPACE assignments
 # ------------------------------------------
-exec alacritty -e tmux
-assign [class="Alacritty"] 2
+exec ghostty -e tmux
+assign [class="ghostty"] 2
 exec --no-startup-id firefox
 assign [class="firefox"] 3
 exec --no-startup-id thunderbird

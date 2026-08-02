@@ -3,8 +3,7 @@
 # NOTE: enabling i3 as a window manager is a NixOS system-level concern
 # (services.xserver.windowManager.i3). This module only provides the user-level
 # config file and companion packages. Enable i3 itself in your NixOS
-# configuration.nix (your existing ~/.config/nixos/configuration.nix already
-# does this).
+# configuration.nix.
 {
   home.packages = with pkgs; [
     # i3 companions and referenced launchers
@@ -35,11 +34,7 @@
     # Browsers / mail — exec'd from i3; move to system config if preferred
     firefox
     thunderbird
-
-    # Terminals referenced from i3 config
-    alacritty
   ];
 
   xdg.configFile."i3".source = ../dotfiles/i3;
-  xdg.configFile."alacritty".source = ../dotfiles/alacritty;
 }
