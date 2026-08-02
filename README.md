@@ -43,8 +43,12 @@ cd ~/dotfiles-nix
 # (~/.zshrc, ~/.config/{nvim,tmux,i3,lf,zsh}, …) to <name>.backup before
 # symlinking. Drop -b backup on a truly empty $HOME.
 nix run github:nix-community/home-manager -- switch -b backup --flake .#v
+```
 
-chsh -s "$(which zsh)"   # once, if zsh isn't your login shell
+The first switch also sets your login shell to zsh via a `home.activation`
+hook (requires zsh in `/etc/shells`; add `environment.shells = [ pkgs.zsh ];`
+to your NixOS config if `chsh` refuses). `nix run .#set-default-shell` does
+the same manually.
 ```
 
 Later rebuilds (home-manager is on PATH after the first activation):

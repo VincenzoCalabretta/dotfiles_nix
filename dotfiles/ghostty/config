@@ -1,2 +1,4 @@
 font-size = 8
 class = ghostty
+command = zsh
+window-decoration = false

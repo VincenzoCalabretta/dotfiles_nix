@@ -47,6 +47,7 @@
     curl
     xclip
     htop
+    fastfetch
 
     # Fonts (nvim, terminals, i3 all expect a Nerd Font)
     nerd-fonts.jetbrains-mono

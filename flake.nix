@@ -23,8 +23,15 @@
         modules = [ ./home.nix ];
       };
 
-      # Convenience alias: `nix run .#activate`
-      packages.${system}.activate =
-        self.homeConfigurations."v".activationPackage;
+      packages.${system} = {
+        # Convenience alias: `nix run .#activate`
+        activate = self.homeConfigurations."v".activationPackage;
+
+        # Set the login shell to zsh: `nix run .#set-default-shell`
+        set-default-shell =
+          pkgs.writeShellScriptBin "set-default-shell" ''
+            exec chsh -s "$(command -v zsh)"
+          '';
+      };
     };
 }
