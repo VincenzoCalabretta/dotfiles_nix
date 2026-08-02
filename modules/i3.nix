@@ -24,9 +24,22 @@
     maim
     slop
 
+    # xorg utilities exec'd from i3 config
+    xorg.xset            # xset r rate 150 40
+    xorg.setxkbmap       # caps:escape remap
+
+    # systray / startup apps launched by i3 exec
+    networkmanagerapplet # nm-applet
+    seafile-client       # Seafile sync applet
+
+    # Browsers / mail — exec'd from i3; move to system config if preferred
+    firefox
+    thunderbird
+
     # Terminals referenced from i3 config
     alacritty
   ];
 
   xdg.configFile."i3".source = ../dotfiles/i3;
+  xdg.configFile."alacritty".source = ../dotfiles/alacritty;
 }

@@ -12,6 +12,9 @@
 
     # ripgrep + fd are shared (see home.nix).
 
+    # GDB + bundled pretty-printer scripts in dotfiles/nvim/gdb/
+    gdb
+
     # LSPs / formatters listed in plugins/lsp.lua ensure_installed
     lua-language-server
     basedpyright

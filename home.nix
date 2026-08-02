@@ -49,6 +49,9 @@
     nerd-fonts.jetbrains-mono
     nerd-fonts.fira-code
 
+    # Misc tools referenced from aliases or scripts
+    highlight           # ccat alias in aliases.zsh
+
     # Dev toolchain — required by nvim LSPs and general use
     gcc
     gnumake
