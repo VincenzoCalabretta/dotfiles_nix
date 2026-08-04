@@ -18,6 +18,11 @@
         config.allowUnfree = true;
       };
     in {
+      # Import from a NixOS host configuration to deploy WireGuard as a
+      # system service. It deliberately remains separate from home-manager:
+      # creating network interfaces requires system privileges.
+      nixosModules.wireguard = import ./modules/wireguard.nix;
+
       homeConfigurations."v" = home-manager.lib.homeManagerConfiguration {
         inherit pkgs;
         modules = [ ./home.nix ];

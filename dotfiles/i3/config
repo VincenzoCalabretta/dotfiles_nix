@@ -184,4 +184,5 @@ bindsym $mod+m move workspace to output left
 
 # Suspend
 bindsym $mod+Shift+period exec systemctl suspend
-bindsym $mod+Shift+p exec --no-startup-id randr_toggle_displays.py
+# i3's inherited PATH does not include ~/.config/tmux/scripts.
+bindsym $mod+Shift+p exec --no-startup-id ~/.config/tmux/scripts/randr_toggle_displays.py

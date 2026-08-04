@@ -17,6 +17,7 @@ modules/
   i3.nix           # dmenu, i3status, rofi…            → ~/.config/i3
   ghostty.nix      # ghostty terminal                   → ~/.config/ghostty
   opencode.nix     # opencode + custom LLM endpoint     → ~/.config/opencode
+  wireguard.nix    # opt-in NixOS WireGuard deployment  → wg-quick service
 dotfiles/          # verbatim source configs (tmux/ nvim/ zsh/ lf/ i3/ ghostty/ opencode/)
 ```
 
@@ -56,6 +57,40 @@ Later rebuilds (home-manager is on PATH after the first activation):
 ```sh
 home-manager switch --flake ~/dotfiles-nix#v
 ```
+
+## WireGuard deployment
+
+WireGuard is deployed by NixOS, rather than home-manager, because bringing up
+an interface requires system privileges. The flake exports an opt-in module;
+it starts `wg-quick-wg1.service` at boot and reconciles both interfaces whenever
+you run `nixos-rebuild switch`.
+
+The default interfaces reference local, uncommitted files at
+`/etc/wireguard/wg1.conf` and `/etc/wireguard/wg3.conf`. `wg1` starts at boot;
+`wg3` is available on demand with `sudo systemctl start wg-quick-wg3`.
+Keep those files root-owned and mode `0600`, and do not copy their private keys
+into this repository or the Nix store. Import and enable the module in the
+host's NixOS configuration:
+
+```nix
+{
+  inputs,
+  ...
+}:
+{
+  imports = [ inputs.dotfiles.nixosModules.wireguard ];
+
+  dotfiles.wireguard = {
+    enable = true;
+  };
+}
+```
+
+The secret file must be readable by root and contain a complete `wg-quick`
+configuration, including `[Interface]` and `[Peer]` sections. To change the
+defaults, set `dotfiles.wireguard.interfaces.<name>.{configFile,autostart}`;
+each interface must have an explicit `autostart` value. Disable the module (or
+the relevant interface's `autostart`) before intentionally removing its file.
 
 First `nvim` launch bootstraps `lazy.nvim` against `dotfiles/nvim/lazy-lock.json`.
 LSPs come from nixpkgs (`modules/nvim.nix`), not Mason. Inside tmux, `prefix + r`
