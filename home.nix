@@ -20,7 +20,7 @@
 
   # Puts tmux/i3 helper scripts (tmux-sessionizer, randr_toggle_displays.py, …)
   # on PATH so config files can invoke them by bare name.
-  home.sessionPath = [ "$HOME/.config/tmux/scripts" ];
+  home.sessionPath = [ "${config.home.homeDirectory}/.config/tmux/scripts" ];
 
   programs.home-manager.enable = true;
 

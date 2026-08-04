@@ -42,4 +42,4 @@ alias pmake='time nice make -j$NUMCPUS --load-average=$NUMCPUS'
 
 alias docs='cd $HOME/docs/'
 
-hm() { home-manager switch --flake ~/dotfiles-nix#v; }
+hm() { home-manager switch --flake "$HOME/dotfiles-nix#v"; }

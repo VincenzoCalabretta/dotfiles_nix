@@ -19,4 +19,10 @@
 
   xdg.configFile."tmux/scripts".source =
     ../dotfiles/tmux/scripts;
+
+  # Data files for tmux-cht.sh cheatsheet script
+  home.file.".tmux-cht-languages".source =
+    ../dotfiles/tmux/tmux-cht-languages;
+  home.file.".tmux-cht-command".source =
+    ../dotfiles/tmux/tmux-cht-command;
 }

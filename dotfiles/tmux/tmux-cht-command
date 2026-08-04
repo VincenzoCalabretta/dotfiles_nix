@@ -1,0 +1,17 @@
+sed
+awk
+jq
+git
+find
+grep
+rg
+fd
+fzf
+curl
+wget
+tar
+docker
+kubectl
+tmux
+nix
+nixos
