@@ -22,7 +22,11 @@ let
   mcpRepoIndex = opencode-mcp-tools.packages.${system}.mcp-repo-index;
   searxng = opencode-mcp-tools.packages.${system}.searxng;
 
-  mcpServer = pkg: { type = "local"; command = [ "${pkg}/bin/${pkg.name}" ]; };
+  # opencode's default MCP request timeout is 5s - fine for the other
+  # servers' tools, but index_repo is a genuine batch operation (parsing +
+  # embedding every file, plus per-file subprocess retries in mcp_repo_index
+  # - see its chunker.py) that can legitimately take minutes on a real repo.
+  mcpServer = pkg: timeout: { type = "local"; command = [ "${pkg}/bin/${pkg.name}" ]; inherit timeout; };
 
   opencodeConfig = {
     "$schema" = "https://opencode.ai/config.json";
@@ -37,11 +41,11 @@ let
       };
     };
     mcp = {
-      search = mcpServer mcpSearch;
-      code-search = mcpServer mcpCodeSearch;
-      test-runner = mcpServer mcpTestRunner;
-      grammar = mcpServer mcpGrammar;
-      repo-index = mcpServer mcpRepoIndex;
+      search = mcpServer mcpSearch 5000;
+      code-search = mcpServer mcpCodeSearch 5000;
+      test-runner = mcpServer mcpTestRunner 300000;
+      grammar = mcpServer mcpGrammar 60000;
+      repo-index = mcpServer mcpRepoIndex 300000;
     };
     lsp = true;
   };
