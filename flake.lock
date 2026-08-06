@@ -62,11 +62,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1786029529,
-        "narHash": "sha256-fpjq4fTxfRBbFiWxeSGO/9yZDWVbYqjRU+wFvbbuktk=",
+        "lastModified": 1786035295,
+        "narHash": "sha256-tZk4M56EfRdjZ4FVwQY8YOafNU9HlivhqjajfUqcQtU=",
         "ref": "refs/heads/master",
-        "rev": "cd74e03eaa103a9330f4444b1a3c295927e6ef38",
-        "revCount": 3,
+        "rev": "033b306f9e54fe67bff1db05b8cbb4657fa49b19",
+        "revCount": 4,
         "type": "git",
         "url": "ssh://git@10.10.0.101/v/llama-server.git"
       },
@@ -129,11 +129,11 @@
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
-        "lastModified": 1786030235,
-        "narHash": "sha256-lu883fI2whjZnC4YDrstxfXs75E8/zGGPrBmjItSHek=",
+        "lastModified": 1786035356,
+        "narHash": "sha256-OOmRhA3j85kZmjDPmmdvs8EW/RJ1pwvOA7dglA/fzyQ=",
         "ref": "refs/heads/master",
-        "rev": "58b2a53e6fcc696ba5b01eb2eb9c2e135bbaa699",
-        "revCount": 2,
+        "rev": "52e19e216d3281b46f5005c634fe03abc4d99f91",
+        "revCount": 4,
         "type": "git",
         "url": "ssh://git@10.10.0.101/v/opencode-mcp-tools.git"
       },

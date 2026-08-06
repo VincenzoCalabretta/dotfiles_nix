@@ -14,10 +14,12 @@ let
   system = pkgs.stdenv.hostPlatform.system;
 
   llamaServer = llama-server.packages.${system}.default;
+  embedServer = llama-server.packages.${system}.embed-server;
   mcpSearch = opencode-mcp-tools.packages.${system}.mcp-search;
   mcpCodeSearch = opencode-mcp-tools.packages.${system}.mcp-code-search;
   mcpTestRunner = opencode-mcp-tools.packages.${system}.mcp-test-runner;
   mcpGrammar = opencode-mcp-tools.packages.${system}.mcp-grammar;
+  mcpRepoIndex = opencode-mcp-tools.packages.${system}.mcp-repo-index;
   searxng = opencode-mcp-tools.packages.${system}.searxng;
 
   mcpServer = pkg: { type = "local"; command = [ "${pkg}/bin/${pkg.name}" ]; };
@@ -39,6 +41,7 @@ let
       code-search = mcpServer mcpCodeSearch;
       test-runner = mcpServer mcpTestRunner;
       grammar = mcpServer mcpGrammar;
+      repo-index = mcpServer mcpRepoIndex;
     };
     lsp = true;
   };
@@ -69,6 +72,14 @@ in
     Unit.Description = "Local SearXNG instance backing opencode's mcp_search tool";
     Service = {
       ExecStart = "${searxng}/bin/${searxng.name}";
+      Restart = "on-failure";
+    };
+  };
+
+  systemd.user.services.opencode-embed = {
+    Unit.Description = "CPU-only embedding server backing opencode's mcp_repo_index tool";
+    Service = {
+      ExecStart = "${embedServer}/bin/${embedServer.name}";
       Restart = "on-failure";
     };
   };
