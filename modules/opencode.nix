@@ -48,7 +48,40 @@ let
       repo-index = mcpServer mcpRepoIndex 300000;
     };
     lsp = true;
+    # Standing directive, always in context (opencode's AGENTS.md-equivalent
+    # mechanism) - written to ~/.config/opencode/AGENTS.md below. Added
+    # because a smaller local model was observed only reaching for
+    # repo-index's tools when explicitly told to, not proactively - see
+    # that file for the actual guidance.
+    instructions = [ "~/.config/opencode/AGENTS.md" ];
   };
+
+  agentsInstructions = ''
+    # Agent instructions
+
+    ## Repo indexing (repo-index MCP server)
+
+    If the `repo-index` MCP server is connected, treat these as default
+    behavior, not something to wait to be asked for:
+
+    - At the start of working in a repository (or a subdirectory you
+      haven't indexed yet this session), call `index_repo` for its root
+      path before doing anything else that needs to understand the
+      codebase. It is cheap and safe to call repeatedly - unchanged files
+      are skipped, so re-running it after the first call in a session is
+      fast.
+    - Prefer `semantic_search` and `repo_map` over `grep_code`/glob/file
+      listing whenever the question is about *how* something works, *why*
+      it's structured a certain way, or where a counterpart/related
+      implementation lives that you haven't already located (e.g. "is
+      there a C++ version of this Python component?", "where do we handle
+      retries?", "what calls this function?"). Don't wait for the user to
+      say "use the indexed repository" - if the tool is connected, use it
+      as a first resort for these questions, not a last resort.
+    - Still use `grep_code`/glob directly when you already know the exact
+      file, symbol name, or literal string you're looking for - the index
+      is for discovery, not a replacement for exact lookups.
+  '';
 in
 {
   home.packages = [
@@ -58,6 +91,7 @@ in
   ];
 
   xdg.configFile."opencode/opencode.json".text = builtins.toJSON opencodeConfig;
+  xdg.configFile."opencode/AGENTS.md".text = agentsInstructions;
 
   # On-demand only (`systemctl --user start llama-server` /
   # `opencode-searxng`) - deliberately no [Install]/wantedBy, since
