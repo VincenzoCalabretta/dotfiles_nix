@@ -9,6 +9,7 @@
     ./modules/i3.nix
     ./modules/ghostty.nix
     ./modules/opencode.nix
+    ./modules/rust.nix
   ];
 
   home.username = "v";
@@ -21,6 +22,16 @@
   # Puts tmux/i3 helper scripts (tmux-sessionizer, randr_toggle_displays.py, …)
   # on PATH so config files can invoke them by bare name.
   home.sessionPath = [ "${config.home.homeDirectory}/.config/tmux/scripts" ];
+
+  # The X session here is started manually via `startx`/xinit (no display
+  # manager), so nothing else sources home-manager's session-vars script —
+  # home.sessionPath above would silently never reach i3, ghostty, or the
+  # tmux server without this. Managing .xinitrc declaratively keeps that
+  # wiring reproducible instead of depending on a hand-edited file in $HOME.
+  home.file.".xinitrc".text = ''
+    . "$HOME/.nix-profile/etc/profile.d/hm-session-vars.sh"
+    exec i3
+  '';
 
   programs.home-manager.enable = true;
 
@@ -48,6 +59,7 @@
     xclip
     htop
     fastfetch
+    lm_sensors           # sensors command
 
     # Fonts (nvim, terminals, i3 all expect a Nerd Font)
     nerd-fonts.jetbrains-mono
