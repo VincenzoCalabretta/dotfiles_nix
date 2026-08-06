@@ -9,6 +9,7 @@ Modules provide every runtime dependency the configs reference.
 ```
 flake.nix          # inputs: nixpkgs (unstable) + home-manager
 home.nix           # shared packages, programs.direnv, sessionPath, module imports
+hosts/nixos/       # versioned NixOS host configuration and hardware scan
 modules/
   tmux.nix         # tmux + python3 + xrandr           → ~/.config/tmux
   nvim.nix         # neovim + LSPs + build deps        → ~/.config/nvim
@@ -16,15 +17,18 @@ modules/
   lf.nix           # lf + archive tools + mimeopen     → ~/.config/lf
   i3.nix           # dmenu, i3status, rofi…            → ~/.config/i3
   ghostty.nix      # ghostty terminal                   → ~/.config/ghostty
-  opencode.nix     # opencode + custom LLM endpoint     → ~/.config/opencode
+  opencode.nix     # opencode + local LLM + MCP tools    → ~/.config/opencode
   wireguard.nix    # opt-in NixOS WireGuard deployment  → wg-quick service
 dotfiles/          # verbatim source configs (tmux/ nvim/ zsh/ lf/ i3/ ghostty/ opencode/)
 ```
 
-LLM providers go in `dotfiles/opencode/opencode.json`. OpenRouter is built-in:
-export `OPENROUTER_API_KEY` (or `/connect` → OpenRouter) and select
-`openrouter/deepseek/deepseek-v4-flash` via `/models`. The current config sets it
-as the default model.
+OpenCode is configured for a local llama.cpp server plus MCP tools (web
+search, structural code search, a test/build feedback loop, structured
+output) - both built from flake inputs fetched from Forgejo
+(`10.10.0.101`), not a manual sibling checkout. `home-manager switch` alone
+is enough to deploy it; start the services with
+`systemctl --user start llama-server opencode-searxng`, then run `opencode`.
+See [`dotfiles/opencode/README.md`](dotfiles/opencode/README.md) for details.
 
 `home.sessionPath` prepends `~/.config/tmux/scripts` so helpers
 (`tmux-sessionizer`, `randr_toggle_displays.py`, `tmux-cht.sh`, …) resolve
@@ -57,6 +61,33 @@ Later rebuilds (home-manager is on PATH after the first activation):
 ```sh
 home-manager switch --flake ~/dotfiles-nix#v
 ```
+
+## NixOS host configuration
+
+The active `nixos` host configuration is versioned as the flake output
+`nixosConfigurations.nixos`. It imports the reusable modules under `modules/`
+and keeps the generated disk and boot description in
+`hosts/nixos/hardware-configuration.nix`. The hardware file contains machine
+identifiers and filesystem UUIDs, so it is specific to this host.
+
+See [`hosts/nixos/README.md`](hosts/nixos/README.md) for the complete
+validation, deployment, and rollback procedure.
+
+Deployment is intentionally explicit; evaluating or updating this checkout
+does not change the running system:
+
+```sh
+# Build and validate the next generation without activating it.
+nix run ~/dotfiles-nix#nixos-build
+
+# Build and activate it (requires sudo).
+nix run ~/dotfiles-nix#nixos-switch
+```
+
+Before the first switch, compare `hosts/nixos/` with the live `/etc/nixos/`
+configuration and commit the desired state. Regenerate the hardware file only
+after hardware or partition-layout changes, then review and commit its diff.
+WireGuard private keys remain outside the repository in `/etc/wireguard/`.
 
 ## WireGuard deployment
 
