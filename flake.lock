@@ -129,11 +129,11 @@
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
-        "lastModified": 1786040839,
-        "narHash": "sha256-4EQ9Me8pEuqGEYv0/D78G5nGHLc+0F7OLiC4r0kBJ0Q=",
+        "lastModified": 1786041226,
+        "narHash": "sha256-r947CnQ4syDNtCPfYPiQVsTjDiaPvTW3GtQMPBJDYqs=",
         "ref": "refs/heads/master",
-        "rev": "3aed121b559320d4360d3d28bc360f3fabf13d1d",
-        "revCount": 6,
+        "rev": "5c06a0083a9e09ea8732bb5e1fd2b6714f020b39",
+        "revCount": 7,
         "type": "git",
         "url": "ssh://git@10.10.0.101/v/opencode-mcp-tools.git"
       },
