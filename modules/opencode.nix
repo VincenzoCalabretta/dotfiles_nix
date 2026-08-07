@@ -90,19 +90,30 @@ in
     pkgs.nixd # opencode's built-in Nix LSP looks for this exact binary
   ];
 
-  # Read by dotfiles/opencode/plugins/reindex-on-save.js (opencode
-  # auto-loads any .js/.ts file under ~/.config/opencode/plugins/ - no
-  # config.json entry needed, unlike MCP servers or npm-published plugins)
-  # so that plugin can invoke the exact same repo-index binary the MCP
-  # server above uses, without hardcoding a Nix store path inside a JS
-  # file - keeps that file a plain, verbatim static config like the rest
-  # of dotfiles/.
-  home.sessionVariables.OPENCODE_REPO_INDEX_BIN = "${mcpRepoIndex}/bin/${mcpRepoIndex.name}";
-
   xdg.configFile."opencode/opencode.json".text = builtins.toJSON opencodeConfig;
   xdg.configFile."opencode/AGENTS.md".text = agentsInstructions;
   xdg.configFile."opencode/plugins/reindex-on-save.js".source =
     ../dotfiles/opencode/plugins/reindex-on-save.js;
+  # Read by that plugin (opencode auto-loads any .js/.ts file under
+  # ~/.config/opencode/plugins/ - no config.json entry needed, unlike MCP
+  # servers or npm-published plugins) at opencode-process-startup time -
+  # NOT a home.sessionVariables env var, deliberately: this machine starts
+  # X manually via startx/xinit (see home.nix), so session vars are only
+  # ever sourced once, by .xinitrc, at X startup - a plain file opencode
+  # re-reads on every launch is what actually stays in sync with each
+  # `home-manager switch` without requiring a full X session restart,
+  # matching how opencode.json's own baked-in MCP server path behaves.
+  xdg.configFile."opencode/repo-index-bin".text = "${mcpRepoIndex}/bin/${mcpRepoIndex.name}";
+  # `setsid` (util-linux) - the plugin runs index-once through it to give
+  # the child its own session, fully detached from opencode's process
+  # group. A live test proved this is genuinely necessary, not paranoia:
+  # Bun.spawn's own `proc.unref()` (Bun's equivalent of Node's `detached`)
+  # was NOT enough on its own to keep the child alive once the *parent*
+  # opencode process's process group got torn down (observed with
+  # `opencode run`'s one-shot headless mode exiting right after its
+  # response) - only adding setsid on top made the reindex reliably
+  # survive and actually complete.
+  xdg.configFile."opencode/setsid-bin".text = "${pkgs.util-linux}/bin/setsid";
 
   # On-demand only (`systemctl --user start llama-server` /
   # `opencode-searxng`) - deliberately no [Install]/wantedBy, since

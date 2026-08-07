@@ -26,13 +26,16 @@ whether or not you end up using opencode that session:
 ```sh
 systemctl --user start llama-server
 systemctl --user start opencode-searxng   # only needed for web search
+systemctl --user start opencode-embed     # only needed for repo-index's semantic search/notes
 opencode
 ```
 
-`opencode mcp list` should show all four MCP servers (`search`, `code-search`,
-`test-runner`, `grammar`) as connected regardless of whether SearXNG/llama-server
-are running yet - only the tool calls that actually hit them will fail until
-you start those two services.
+`opencode mcp list` should show all five MCP servers (`search`, `code-search`,
+`test-runner`, `grammar`, `repo-index`) as connected regardless of whether
+SearXNG/llama-server/the embed server are running yet - only the tool calls
+that actually hit them will fail until you start those services.
+`repo-index`'s `index_repo`/`semantic_search`/`remember_note`/`recall_notes`
+specifically need `opencode-embed`; `repo_map`/`find_symbol` don't.
 
 ## Reindex-on-save plugin
 
@@ -40,21 +43,30 @@ you start those two services.
 `~/.config/opencode/plugins/` - no `opencode.json` entry needed) that keeps
 `opencode-mcp-repo-index`'s per-repo index warm without spending a model
 turn on it. It hooks `tool.execute.after`, and after a file-modifying tool
-call (`write`/`edit`/`apply_patch`) it runs `index-once <project dir>` in
+call (`write`/`edit`/`apply_patch`) it spawns `index-once <project dir>` in
 the background - the same indexing logic `index_repo` runs over MCP, just
-invoked directly as a CLI subcommand, so no MCP round-trip. Debounced
-(2s), so a burst of edits triggers one reindex shortly after it settles,
-not one per edit.
+invoked directly as a CLI subcommand, so no MCP round-trip. Throttled (not
+debounced): it fires on the first edit of a burst and ignores repeats for
+1.5s, rather than waiting for the burst to settle - verified live that a
+trailing debounce is the wrong shape here, since `opencode run`'s one-shot
+headless mode can exit within tens of milliseconds of the last tool call,
+before a deferred timer would ever fire.
 
-It reads the repo-index binary's path from `$OPENCODE_REPO_INDEX_BIN`
-(set by `modules/opencode.nix` to the same Nix store path the `repo-index`
-MCP server itself uses) rather than hardcoding a store path inside the JS
-file. That variable is exported via home-manager's session-vars mechanism
-(`~/.nix-profile/etc/profile.d/hm-session-vars.sh`), which only re-sources
-once per shell (guarded by `$__HM_SESS_VARS_SOURCED`) - **a shell open
-before a `home-manager switch` that changed this path won't pick up the
-new value**, so open a fresh terminal (or `exec zsh -l`) before starting
-`opencode` after any update that touches `opencode-mcp-tools`.
+It reads the `repo-index`/`setsid` binaries' paths from plain files
+(`~/.config/opencode/{repo-index-bin,setsid-bin}`, written by
+`modules/opencode.nix` to the same Nix store paths those packages already
+build) at plugin-load time - i.e. fresh on every `opencode` launch, same
+timing as `opencode.json`'s own baked-in MCP server path - rather than an
+env var, which on this machine would only refresh once per X session (see
+`home.nix`'s `.xinitrc` comment), not once per shell or per `opencode`
+launch.
+
+The spawned `index-once` process runs through `setsid` and is
+`.unref()`'d - both were confirmed live to matter, not just defensive
+overkill: `proc.unref()` alone (Bun's equivalent of Node's `detached`)
+was not enough to keep the reindex alive past `opencode run`'s process
+exiting; only adding `setsid` (a full new OS session, not just Bun's own
+internal child-tracking) made it reliably survive and complete.
 
 ## Redeploying on a new machine
 
@@ -68,4 +80,4 @@ new value**, so open a fresh terminal (or `exec zsh -l`) before starting
    (`nvidia-smi --query-gpu=compute_cap --format=csv`), and re-check the
    `--n-cpu-moe`/`--ctx-size`/KV-cache-quant flags there, which were tuned
    for an 8GB VRAM budget.
-4. `systemctl --user start llama-server opencode-searxng`, then `opencode`.
+4. `systemctl --user start llama-server opencode-searxng opencode-embed`, then `opencode`.
