@@ -37,7 +37,7 @@ let
       options.baseURL = "http://127.0.0.1:8080/v1";
       models."qwen3-30b-a3b-instruct-2507" = {
         name = "Qwen3 30B-A3B Instruct Q4_K_M (local)";
-        limit = { context = 65536; output = 8192; };
+        limit = { context = 98304; output = 8192; };
       };
     };
     mcp = {
