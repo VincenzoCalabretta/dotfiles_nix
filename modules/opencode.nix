@@ -90,8 +90,19 @@ in
     pkgs.nixd # opencode's built-in Nix LSP looks for this exact binary
   ];
 
+  # Read by dotfiles/opencode/plugins/reindex-on-save.js (opencode
+  # auto-loads any .js/.ts file under ~/.config/opencode/plugins/ - no
+  # config.json entry needed, unlike MCP servers or npm-published plugins)
+  # so that plugin can invoke the exact same repo-index binary the MCP
+  # server above uses, without hardcoding a Nix store path inside a JS
+  # file - keeps that file a plain, verbatim static config like the rest
+  # of dotfiles/.
+  home.sessionVariables.OPENCODE_REPO_INDEX_BIN = "${mcpRepoIndex}/bin/${mcpRepoIndex.name}";
+
   xdg.configFile."opencode/opencode.json".text = builtins.toJSON opencodeConfig;
   xdg.configFile."opencode/AGENTS.md".text = agentsInstructions;
+  xdg.configFile."opencode/plugins/reindex-on-save.js".source =
+    ../dotfiles/opencode/plugins/reindex-on-save.js;
 
   # On-demand only (`systemctl --user start llama-server` /
   # `opencode-searxng`) - deliberately no [Install]/wantedBy, since

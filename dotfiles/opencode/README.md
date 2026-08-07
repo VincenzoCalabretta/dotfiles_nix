@@ -34,6 +34,28 @@ opencode
 are running yet - only the tool calls that actually hit them will fail until
 you start those two services.
 
+## Reindex-on-save plugin
+
+`plugins/reindex-on-save.js` is an opencode local plugin (auto-loaded from
+`~/.config/opencode/plugins/` - no `opencode.json` entry needed) that keeps
+`opencode-mcp-repo-index`'s per-repo index warm without spending a model
+turn on it. It hooks `tool.execute.after`, and after a file-modifying tool
+call (`write`/`edit`/`apply_patch`) it runs `index-once <project dir>` in
+the background - the same indexing logic `index_repo` runs over MCP, just
+invoked directly as a CLI subcommand, so no MCP round-trip. Debounced
+(2s), so a burst of edits triggers one reindex shortly after it settles,
+not one per edit.
+
+It reads the repo-index binary's path from `$OPENCODE_REPO_INDEX_BIN`
+(set by `modules/opencode.nix` to the same Nix store path the `repo-index`
+MCP server itself uses) rather than hardcoding a store path inside the JS
+file. That variable is exported via home-manager's session-vars mechanism
+(`~/.nix-profile/etc/profile.d/hm-session-vars.sh`), which only re-sources
+once per shell (guarded by `$__HM_SESS_VARS_SOURCED`) - **a shell open
+before a `home-manager switch` that changed this path won't pick up the
+new value**, so open a fresh terminal (or `exec zsh -l`) before starting
+`opencode` after any update that touches `opencode-mcp-tools`.
+
 ## Redeploying on a new machine
 
 1. Install Nix (flakes enabled) and make sure the machine has the SSH key
