@@ -1,8 +1,8 @@
-# Deploying the `nixos` host
+# Deploying the `home` host
 
-This directory is the version-controlled NixOS configuration for the host
-named `nixos`. It replaces an ad-hoc `/etc/nixos/configuration.nix` workflow;
-the flake output is `nixosConfigurations.nixos`.
+This directory is the version-controlled NixOS configuration for the desktop
+host named `nixos`. The flake output is `nixosConfigurations.home`; invoke it
+with `#home`.
 
 ## Before deploying
 
@@ -25,23 +25,26 @@ Build the next system generation and leave the currently booted configuration
 untouched:
 
 ```sh
-nix run ~/dotfiles-nix#nixos-build
+nix run ~/dotfiles-nix#home-build
 ```
 
 This is the recommended check before deployment. The resulting `result`
 symlink points to the built system closure.
 
-## Deploy the configuration
-
-Activate a new system generation now and make it the boot default:
+## Deploy the full stack (NixOS + home-manager + shell)
 
 ```sh
-nix run ~/dotfiles-nix#nixos-switch
+nix run ~/dotfiles-nix#deploy-host -- --host home
 ```
 
-The app invokes `sudo nixos-rebuild switch --flake ~/dotfiles-nix#nixos`.
-It prompts for administrator authentication and is the only deployment step;
-ordinary flake evaluation and `nixos-build` do not modify the running system.
+This builds and switches the system configuration, activates the home-manager
+profile, and sets zsh as the login shell — all in one invocation.
+
+Alternatively, deploy the system configuration alone:
+
+```sh
+nix run ~/dotfiles-nix#home-switch
+```
 
 After switching, verify the active generation:
 
@@ -49,6 +52,16 @@ After switching, verify the active generation:
 readlink -f /run/current-system
 nixos-rebuild list-generations
 ```
+
+## Snapshot the live config into the repo
+
+```sh
+nix run ~/dotfiles-nix#capture-host -- --host home
+```
+
+Copies `/etc/nixos/{configuration,hardware-configuration}.nix` into this
+directory with absolute imports rewritten to repo-relative paths. Review and
+commit the result.
 
 ## Roll back
 

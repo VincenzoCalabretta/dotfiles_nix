@@ -35,15 +35,25 @@
     in {
       # Versioned NixOS host configurations.  Building or switching one is
       # deliberately opt-in through the apps below.
-      nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
-        inherit system;
-        modules = [ ./hosts/nixos/configuration.nix ];
+      nixosConfigurations = {
+        home = nixpkgs.lib.nixosSystem {
+          inherit system;
+          modules = [ ./hosts/home/configuration.nix ];
+        };
+        server = nixpkgs.lib.nixosSystem {
+          inherit system;
+          modules = [ ./hosts/server/configuration.nix ];
+        };
       };
 
       # Import from a NixOS host configuration to deploy WireGuard as a
       # system service. It deliberately remains separate from home-manager:
       # creating network interfaces requires system privileges.
       nixosModules.wireguard = import ./modules/wireguard.nix;
+
+      # Import from a NixOS host configuration to deploy a Forgejo Actions
+      # runner that runs CI jobs on this machine (host execution, no Docker).
+      nixosModules.forgejo-runner = import ./modules/forgejo-runner.nix;
 
       homeConfigurations."v" = home-manager.lib.homeManagerConfiguration {
         inherit pkgs;
@@ -60,21 +70,66 @@
           pkgs.writeShellScriptBin "set-default-shell" ''
             exec chsh -s "$(command -v zsh)"
           '';
+
+        # Single-stop deploy: nixos-rebuild switch + home-manager + shell
+        deploy-host = pkgs.writeShellScriptBin "deploy-host" ''
+          exec ${./tools/deploy-host.sh} --flake "${self}" "$@"
+        '';
+
+        # Snapshot live /etc/nixos/* into the repo with portable imports
+        capture-host = pkgs.writeShellScriptBin "capture-host" ''
+          exec ${./tools/capture-host.sh} "$@"
+        '';
       };
 
       apps.${system} = {
-        nixos-build = {
+        home-build = {
           type = "app";
-          program = "${pkgs.writeShellScript "nixos-build" ''
-            exec ${pkgs.nixos-rebuild}/bin/nixos-rebuild build --flake ${self}#nixos "$@"
+          program = "${pkgs.writeShellScript "home-build" ''
+            exec ${pkgs.nixos-rebuild}/bin/nixos-rebuild build --flake ${self}#home "$@"
           ''}";
         };
 
-        nixos-switch = {
+        home-switch = {
           type = "app";
-          program = "${pkgs.writeShellScript "nixos-switch" ''
-            exec sudo ${pkgs.nixos-rebuild}/bin/nixos-rebuild switch --flake ${self}#nixos "$@"
+          program = "${pkgs.writeShellScript "home-switch" ''
+            exec sudo ${pkgs.nixos-rebuild}/bin/nixos-rebuild switch --flake ${self}#home "$@"
           ''}";
+        };
+
+        server-build = {
+          type = "app";
+          program = "${pkgs.writeShellScript "server-build" ''
+            exec ${pkgs.nixos-rebuild}/bin/nixos-rebuild build --flake ${self}#server "$@"
+          ''}";
+        };
+
+        server-switch = {
+          type = "app";
+          program = "${pkgs.writeShellScript "server-switch" ''
+            exec sudo ${pkgs.nixos-rebuild}/bin/nixos-rebuild switch --flake ${self}#server "$@"
+          ''}";
+        };
+
+        deploy-host = {
+          type = "app";
+          program = "${self.packages.${system}.deploy-host}/bin/deploy-host";
+        };
+
+        capture-host = {
+          type = "app";
+          program = "${self.packages.${system}.capture-host}/bin/capture-host";
+        };
+      };
+
+      # CI checks. `nix flake check` builds everything: packages, apps, checks.
+      checks.${system} = {
+        home-manager-build = self.homeConfigurations."v".activationPackage;
+        system-server-toplevel = self.nixosConfigurations.server.config.system.build.toplevel;
+        system-home-toplevel   = self.nixosConfigurations.home.config.system.build.toplevel;
+        deploy-tools = pkgs.symlinkJoin {
+          name = "deploy-tools";
+          paths = with self.packages.${system}; [ activate set-default-shell deploy-host capture-host ];
         };
       };
     };

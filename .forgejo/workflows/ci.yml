@@ -1,0 +1,24 @@
+name: CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  checks:
+    runs-on: [self-hosted]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - run: nix flake check 2>&1 | tail -20
+      - run: nix run github:nix-community/home-manager -- build --flake .#v 2>&1 | tail -5
+
+  system-builds:
+    runs-on: [self-hosted]
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - run: nix build .#nixosConfigurations.server.config.system.build.toplevel 2>&1 | tail -10
+      - run: nix build .#nixosConfigurations.home.config.system.build.toplevel 2>&1 | tail -10
+      - run: nix run .#server-build 2>&1 | tail -5
+      - run: nix run .#home-build 2>&1 | tail -5
