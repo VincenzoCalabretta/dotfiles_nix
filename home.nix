@@ -9,6 +9,7 @@
     ./modules/i3.nix
     ./modules/ghostty.nix
     ./modules/opencode.nix
+    ./modules/claude.nix
     ./modules/rust.nix
   ];
 
@@ -48,18 +49,20 @@
     fd
     fzf
     bat
-    eza
+    eza                     # modern ls replacement (icons, git status, tree view)
     jq
     unzip
-    unrar
-    p7zip
+    unrar                    # extracts .rar archives
+    p7zip                    # extracts/creates .7z archives
     file
     wget
     curl
-    xclip
+    xclip                    # CLI clipboard access (used by yank binds)
     htop
-    fastfetch
+    fastfetch                # neofetch-style system info summary
     lm_sensors           # sensors command
+    ncdu                  # interactive disk usage analyzer
+    wireshark             # network protocol analyzer / packet capture (passwordless capture set up via dotfiles.wireshark, hosts/home)
 
     # Fonts (nvim, terminals, i3 all expect a Nerd Font)
     nerd-fonts.jetbrains-mono
@@ -67,17 +70,17 @@
 
     # Misc tools referenced from aliases or scripts
     highlight           # ccat alias in aliases.zsh
+    imagemagick          # import, convert, mogrify, etc.
 
     # Dev toolchain — required by nvim LSPs and general use
     gcc
     gnumake
-    pkg-config
+    pkg-config           # locates library compile/link flags for builds
     git
 
     # Programs
-    keepassxc
-    codex
-    claude-code
+    keepassxc             # password manager
+    codex                  # OpenAI's CLI coding agent
   ];
 
   fonts.fontconfig.enable = true;

@@ -54,6 +54,51 @@ let
     # repo-index's tools when explicitly told to, not proactively - see
     # that file for the actual guidance.
     instructions = [ "~/.config/opencode/AGENTS.md" ];
+    # "allow" everything (read/edit/bash/external_directory/etc, equivalent
+    # to CLI --auto) - with no "permission" key at all opencode defaults
+    # every edit/bash/external_directory action to an interactive
+    # ask-for-confirmation prompt. That's fine in the TUI, but it silently
+    # stalls/denies actions when there's no one watching to approve (e.g.
+    # editing a reposync-mirrored repo under /tmp) and the local model has
+    # no way to explain *why* the tool call failed, so it fabricates a
+    # plausible-sounding wrong reason instead. Trusted single-user local
+    # setup, so blanket allow is acceptable here.
+    permission = "allow";
+  };
+
+  # Wraps the real opencode binary so `opencode` starts llama-server +
+  # opencode-embed on launch and stops them on exit, instead of requiring
+  # `systemctl --user start` by hand first. Doesn't just wantedBy-enable the
+  # units at login: wantedBy ties a unit to another *unit*'s lifecycle (a
+  # target, a socket, etc), and opencode is a plain CLI process, not a
+  # systemd unit, so there's no unit-level dependency that means "when this
+  # binary runs." Hence wrapping the binary itself.
+  #
+  # Only stops the servers if no other opencode process is still running
+  # (checked via `pgrep -f` against the real binary's exact store path,
+  # which only matches actual `opencode` child processes spawned by this
+  # wrapper, not the wrapper script itself) - otherwise closing one of
+  # several concurrent sessions (e.g. separate tmux panes) would yank the
+  # model out from under the others.
+  opencodeWrapped = pkgs.writeShellApplication {
+    name = "opencode";
+    runtimeInputs = [ pkgs.systemd pkgs.procps ];
+    text = ''
+      real_opencode="${pkgs.opencode}/bin/opencode"
+
+      systemctl --user start llama-server.service opencode-embed.service
+
+      set +e
+      "$real_opencode" "$@"
+      status=$?
+      set -e
+
+      if ! pgrep -f "$real_opencode" > /dev/null; then
+        systemctl --user stop llama-server.service opencode-embed.service
+      fi
+
+      exit "$status"
+    '';
   };
 
   agentsInstructions = ''
@@ -85,7 +130,7 @@ let
 in
 {
   home.packages = [
-    pkgs.opencode
+    opencodeWrapped
     pkgs.pyright # opencode's built-in Python LSP looks for this exact binary
     pkgs.nixd # opencode's built-in Nix LSP looks for this exact binary
   ];
@@ -115,11 +160,12 @@ in
   # survive and actually complete.
   xdg.configFile."opencode/setsid-bin".text = "${pkgs.util-linux}/bin/setsid";
 
-  # On-demand only (`systemctl --user start llama-server` /
-  # `opencode-searxng`) - deliberately no [Install]/wantedBy, since
-  # auto-starting the 30B model at every login would permanently reserve
-  # ~7GB of this laptop's 8GB VRAM whether or not opencode gets used that
-  # session.
+  # On-demand only - deliberately no [Install]/wantedBy, since auto-starting
+  # the 30B model at every login would permanently reserve ~7GB of this
+  # laptop's 8GB VRAM whether or not opencode gets used that session.
+  # llama-server and opencode-embed are instead started/stopped around
+  # opencode's own lifecycle by opencodeWrapped, above; opencode-searxng is
+  # still fully manual (`systemctl --user start opencode-searxng`).
   systemd.user.services.llama-server = {
     Unit.Description = "Local llama.cpp server (Qwen3-30B-A3B) for opencode";
     Service = {

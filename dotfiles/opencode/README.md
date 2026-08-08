@@ -18,24 +18,31 @@ in `modules/opencode.nix` (keep the `/v1` suffix).
 
 ## Starting things up
 
-Both the model server and the SearXNG instance backing `mcp_search` are
-installed as **on-demand** systemd user services - deliberately not enabled
-at login, since the 30B model reserves most of an 8GB laptop GPU's VRAM
-whether or not you end up using opencode that session:
+`opencode` (the binary `modules/opencode.nix` puts on `PATH`) is a wrapper
+around the real opencode: it runs `systemctl --user start llama-server
+opencode-embed` before launching, and stops both after opencode exits -  but
+only if no other opencode session is still running, so closing one of
+several concurrent sessions (e.g. separate tmux panes) doesn't yank the
+model out from under the others. Deliberately not enabled at login (no
+`[Install]`/`wantedBy` on either unit), since the 30B model reserves most of
+an 8GB laptop GPU's VRAM whether or not opencode ends up running that
+session - so it's tied to opencode's own lifecycle instead.
+
+SearXNG (backing `mcp_search`) isn't part of that wrapper and stays fully
+manual:
 
 ```sh
-systemctl --user start llama-server
 systemctl --user start opencode-searxng   # only needed for web search
-systemctl --user start opencode-embed     # only needed for repo-index's semantic search/notes
 opencode
 ```
 
 `opencode mcp list` should show all five MCP servers (`search`, `code-search`,
 `test-runner`, `grammar`, `repo-index`) as connected regardless of whether
 SearXNG/llama-server/the embed server are running yet - only the tool calls
-that actually hit them will fail until you start those services.
+that actually hit them will fail until those services are up.
 `repo-index`'s `index_repo`/`semantic_search`/`remember_note`/`recall_notes`
-specifically need `opencode-embed`; `repo_map`/`find_symbol` don't.
+specifically need `opencode-embed` (started automatically now); `repo_map`/
+`find_symbol` don't.
 
 ## Reindex-on-save plugin
 
@@ -80,4 +87,4 @@ internal child-tracking) made it reliably survive and complete.
    (`nvidia-smi --query-gpu=compute_cap --format=csv`), and re-check the
    `--n-cpu-moe`/`--ctx-size`/KV-cache-quant flags there, which were tuned
    for an 8GB VRAM budget.
-4. `systemctl --user start llama-server opencode-searxng opencode-embed`, then `opencode`.
+4. `systemctl --user start opencode-searxng` (if you want web search), then `opencode` - it starts/stops llama-server and opencode-embed itself.

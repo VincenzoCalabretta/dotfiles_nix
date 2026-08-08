@@ -19,6 +19,7 @@
     brightnessctl
     playerctl
     pulseaudio           # provides pactl for i3 volume bindings
+    pulsemixer           # TUI mixer for PipeWire/Pulse sinks & sources
     scrot
     maim
     slop
