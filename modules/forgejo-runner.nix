@@ -70,6 +70,11 @@ in
     #  - a resolvable user name for nix.settings.trusted-users
     systemd.services."gitea-runner-${cfg.name}" = {
       environment.HOME = mkForce "/var/lib/forgejo-runner";
+      # The runner's own Gitea/Forgejo API client honors settings.runner.insecure
+      # above, but job checkout shells out to plain git/libcurl, which reads the
+      # system OpenSSL trust store instead — so it needs its own opt-out for the
+      # same mkcert certificate.
+      environment.GIT_SSL_NO_VERIFY = "true";
       serviceConfig = {
         User = mkForce "forgejo-runner";
         Group = mkForce "forgejo-runner";
