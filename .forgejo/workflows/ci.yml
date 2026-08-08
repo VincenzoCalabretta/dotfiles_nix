@@ -12,6 +12,10 @@ jobs:
       - uses: actions/checkout@v4
       - run: nix flake check 2>&1 | tail -20
       - run: nix run github:nix-community/home-manager -- build --flake .#v 2>&1 | tail -5
+      - name: CHECKLIST.md coverage (every item classified manual/ci/test)
+        run: nix build .#checks.x86_64-linux.checklist-coverage -L
+      - name: CHECKLIST.md VM test (proves the automatable steps actually work)
+        run: nix build .#checks.x86_64-linux.checklist-vm -L 2>&1 | tail -80
 
   system-builds:
     runs-on: [self-hosted]

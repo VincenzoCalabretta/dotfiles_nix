@@ -246,7 +246,7 @@ Every push and pull request runs two parallel jobs on the self-hosted runner:
 
 | Job             | What it does                           | Typical time |
 |-----------------|----------------------------------------|-------------|
-| `checks`        | `nix flake check` (packages + checks + apps) + home-manager build | ~5 min (cold) |
+| `checks`        | `nix flake check` (packages + checks + apps) + home-manager build + CHECKLIST.md coverage/VM test | ~5 min (cold) |
 | `system-builds` | Full toplevel builds for both NixOS hosts + smoke-test deploy apps | ~5–30 min |
 
 CI workflow: `.forgejo/workflows/ci.yml`. Run locally with:
@@ -257,7 +257,9 @@ nix flake check
 
 `nix flake check` builds all packages (activate, deploy-host, capture-host,
 set-default-shell), apps, and checks (toplevel configs, home-manager activation,
-deploy-tools).
+deploy-tools, `checklist-coverage`, `checklist-vm`) — so it already covers the
+CHECKLIST.md checks below; the dedicated `checks` job steps just give them
+their own named, untruncated CI log entries.
 
 ## deploy-host — single-stop deploy
 
