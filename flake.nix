@@ -131,6 +131,24 @@
           name = "deploy-tools";
           paths = with self.packages.${system}; [ activate set-default-shell deploy-host capture-host ];
         };
+
+        # Proves CHECKLIST.md's automatable points actually hold — see
+        # tests/checklist-vm.nix for what's covered and what's deliberately
+        # out of scope (anything needing the real external Forgejo/hardware).
+        checklist-vm = import ./tests/checklist-vm.nix {
+          inherit pkgs;
+          capture-host-script = ./tools/capture-host.sh;
+          wireguard-module = ./modules/wireguard.nix;
+          forgejo-runner-module = ./modules/forgejo-runner.nix;
+          netdebug-module = ./modules/netdebug.nix;
+          wireshark-module = ./modules/wireshark.nix;
+        };
+
+        # Fails if any CHECKLIST.md item is missing its manual/ci/test marker.
+        checklist-coverage = pkgs.runCommand "checklist-coverage" { } ''
+          ${pkgs.bash}/bin/bash ${./tools/check-checklist-coverage.sh} ${./CHECKLIST.md}
+          touch $out
+        '';
       };
     };
 }

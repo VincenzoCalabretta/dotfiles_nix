@@ -101,6 +101,9 @@ for f in "${DST_CONFIG}" "${TARGET_DIR}/hardware-configuration.nix"; do
   if [[ -f "$f" ]] && grep -q '/etc/wireguard/' "$f" 2>/dev/null; then
     echo "Error: ${f} references /etc/wireguard/ paths."
     echo "Secrets must remain outside the repository. Remove those references first."
+    # Don't leave the offending file(s) on disk — the guardrail should mean
+    # "nothing was written", not "something was written, then complained about".
+    rm -f "${DST_CONFIG}" "${TARGET_DIR}/hardware-configuration.nix"
     exit 1
   fi
 done
