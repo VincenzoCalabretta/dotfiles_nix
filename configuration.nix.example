@@ -1,4 +1,7 @@
 # Paste-ready NixOS configuration.
+# See hosts/home/configuration.nix and hosts/server/configuration.nix for
+# self-contained examples. This file shows how an external flake imports the
+# shared nixosModules from this repo.
 #
 # This file expects your system flake to pass `inputs` through `specialArgs`:
 #   specialArgs = { inherit inputs; };
