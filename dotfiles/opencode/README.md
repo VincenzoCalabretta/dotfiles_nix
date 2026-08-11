@@ -75,6 +75,45 @@ was not enough to keep the reindex alive past `opencode run`'s process
 exiting; only adding `setsid` (a full new OS session, not just Bun's own
 internal child-tracking) made it reliably survive and complete.
 
+## Using both models from a plain LAN client (not running this flake)
+
+`opencode.remote-client.example.json` is a static reference config for a
+machine that just wants to *talk to* the two already-running servers -
+pve-remote's always-on baseline and the laptop's on-demand one - without
+deploying this flake (no local llama-server build, no MCP tools, no
+opencode wrapper). Copy it to `~/.config/opencode/opencode.json` on that
+machine (or merge its `provider` block into an existing config) and install
+`opencode` there some other way (e.g. `npm install -g opencode-ai`).
+
+Both endpoints require being on the `wg1` WireGuard mesh (10.10.0.0/24,
+see `modules/wireguard.nix`) - they're not reachable from the raw Wi-Fi
+LAN. Add the client as a peer on that mesh first (a `wg-quick` config
+pointing at the same network the laptop's `wg1` and pve-remote already
+share); it doesn't need to run NixOS or this flake to do that.
+
+The two providers behave differently:
+- `llama-cpp-pve-remote` (`10.10.0.100:8080`) is the always-on baseline -
+  it should just work. If it doesn't, someone may have run
+  `ssh root@10.10.0.100 gpu-switch finance|ocr` and swapped the coding
+  model out; `gpu-switch coding` switches it back.
+- `llama-cpp-laptop` (`10.10.0.3:8090`) only works while the laptop is
+  powered on and its `llama-relay` unit is running (see "Starting things
+  up" above and `modules/llama-relay.nix`). The *first* request after a
+  cold start can take up to ~120s while `llama-relay.service`'s
+  `wait-for-llama` `ExecStartPre` waits for the model to finish loading
+  into VRAM - make sure your client's request timeout tolerates that, it's
+  not a hung connection.
+
+Switch `model` at the top of the file (or per-session in opencode) between
+`llama-cpp-pve-remote/qwen3-30b-a3b-instruct-2507` and
+`llama-cpp-laptop/qwen3-30b-a3b-instruct-2507` to pick which one answers.
+
+This example intentionally omits `mcp` and `permission: allow` - the MCP
+servers are Nix store paths built by this flake (not present on an
+unmanaged machine), and blanket permission was a deliberate choice for the
+laptop's own single-user trust model (see `modules/opencode.nix`), not
+something to default to for other machines.
+
 ## Redeploying on a new machine
 
 1. Install Nix (flakes enabled) and make sure the machine has the SSH key

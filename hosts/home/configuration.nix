@@ -10,12 +10,14 @@
     ../../modules/wireshark.nix
     ../../modules/forgejo-runner.nix
     ../../modules/netdebug.nix
+    ../../modules/llama-relay.nix
   ];
 
   dotfiles.wireguard.enable = true;
   dotfiles.nvidia.enable = true;
   dotfiles.wireshark.enable = true;
   dotfiles.forgejo-runner.enable = true;
+  dotfiles.llama-relay.enable = true;
 
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;

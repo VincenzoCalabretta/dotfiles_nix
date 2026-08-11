@@ -93,11 +93,37 @@ let
       status=$?
       set -e
 
-      if ! pgrep -f "$real_opencode" > /dev/null; then
+      # Only stop the model if no other local opencode session needs it AND
+      # no remote client is using it via llama-relay (see llama-relay.socket
+      # below) - otherwise closing this session would yank the model out
+      # from under a remote user mid-request.
+      if ! pgrep -f "$real_opencode" > /dev/null \
+        && [ "$(systemctl --user is-active llama-relay.service 2>/dev/null || true)" != "active" ]; then
         systemctl --user stop llama-server.service opencode-embed.service
       fi
 
       exit "$status"
+    '';
+  };
+
+  # Waits for llama-server's HTTP API to actually be serving, not just for
+  # its systemd unit to be "started" (which happens as soon as the process
+  # forks - long before the 30B model finishes loading into VRAM). Used as
+  # llama-relay's ExecStartPre so the very first proxied connection (which is
+  # what triggers llama-server.service via Requires=/After=, see below)
+  # doesn't get forwarded to a port nothing is listening on yet.
+  waitForLlama = pkgs.writeShellApplication {
+    name = "wait-for-llama";
+    runtimeInputs = [ pkgs.curl ];
+    text = ''
+      for _ in $(seq 1 120); do
+        if curl -sf -o /dev/null "http://127.0.0.1:8080/health"; then
+          exit 0
+        fi
+        sleep 1
+      done
+      echo "wait-for-llama: llama-server did not become healthy within 120s" >&2
+      exit 1
     '';
   };
 
@@ -171,6 +197,40 @@ in
     Service = {
       ExecStart = "${llamaServer}/bin/${llamaServer.name}";
       Restart = "on-failure";
+    };
+  };
+
+  # LAN-facing relay onto the loopback-only llama-server above, reachable
+  # over the wg1 WireGuard mesh (see wireguard.nix + configuration.nix's
+  # networking.firewall.interfaces.wg1.allowedTCPPorts) so another machine
+  # can use this laptop's model, not just pve-remote's. Deliberately a
+  # separate port (8090) rather than rebinding llama-server itself to
+  # 0.0.0.0:8080 - keeps the laptop's own on-demand/loopback default
+  # unchanged for local use and adds network exposure only via this socket.
+  #
+  # Socket-activated (Install.WantedBy sockets.target, live after every
+  # login/switch - not requiring `systemctl --user start` by hand) so the
+  # *first* remote connection is what lazily starts llama-server.service,
+  # via this service's Requires=/After=, without needing opencode open
+  # locally at all.
+  systemd.user.sockets.llama-relay = {
+    Unit.Description = "LAN relay socket for llama-server (wg1 only)";
+    Socket = {
+      ListenStream = "8090";
+      Accept = false;
+    };
+    Install.WantedBy = [ "sockets.target" ];
+  };
+
+  systemd.user.services.llama-relay = {
+    Unit = {
+      Description = "LAN relay for llama-server (wg1 only)";
+      Requires = [ "llama-server.service" ];
+      After = [ "llama-server.service" ];
+    };
+    Service = {
+      ExecStartPre = "${waitForLlama}/bin/wait-for-llama";
+      ExecStart = "${pkgs.systemd}/lib/systemd/systemd-socket-proxyd 127.0.0.1:8080";
     };
   };
 
