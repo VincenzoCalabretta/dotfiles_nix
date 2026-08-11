@@ -3,5 +3,10 @@ export PATH="$PATH:$HOME/.cargo/bin"
 export PATH="$PATH:$HOME/julia-1.10.1/bin/"
 export PATH="$PATH:/tools/Xilinx/Vitis/2022.1/bin"
 
+# Real Vivado/Vitis 2023.2 install (see ~/opt/vitis/{Vivado,Vitis}/2023.2).
+# Consumed by the zub_1cg flake's xsct/vivado FHS wrappers, which refuse to
+# run without this set.
+export XILINX_ROOT="$HOME/opt/vitis"
+
 # Created by `pipx` on 2026-06-14 20:35:39
 export PATH="$PATH:/home/v/.local/bin"
