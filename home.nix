@@ -81,6 +81,7 @@
     # Programs
     keepassxc             # password manager
     codex                  # OpenAI's CLI coding agent
+    chromium               # web browser
   ];
 
   fonts.fontconfig.enable = true;
