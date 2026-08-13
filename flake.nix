@@ -28,8 +28,9 @@
       nixosModules.forgejo-runner = import ./modules/forgejo-runner.nix;
 
       # Small, generic, opt-in NixOS building blocks — safe to reuse on any
-      # host. (modules/hardware.nix is deliberately NOT exported: it's this
-      # laptop's own audio/USB-device quirks, not a reusable module.)
+      # host. (Machine-specific quirk modules, e.g. this laptop's own
+      # audio/USB-device fixes, don't live here at all — they're colocated
+      # with the one host they apply to, in the private overlay repo.)
       nixosModules.nixos-base = import ./modules/nixos-base.nix;
       nixosModules.nvidia = import ./modules/nvidia.nix;
       nixosModules.wireshark = import ./modules/wireshark.nix;

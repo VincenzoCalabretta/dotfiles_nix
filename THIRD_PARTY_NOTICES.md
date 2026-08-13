@@ -20,15 +20,16 @@ registration/configuration code is MIT-licensed unless marked otherwise.
 
 ## Generated configuration
 
-`hosts/home/hardware-configuration.nix` and
-`hosts/server/hardware-configuration.nix` were produced by
-`nixos-generate-config` and then retained as machine-specific configuration.
-`dotfiles/i3/config` began as output from `i3-config-wizard` and was customized.
-These configuration outputs contain declarative facts and local choices; no
-NixOS or i3 executable/library is included. They are distributed under the
+`dotfiles/i3/config` began as output from `i3-config-wizard` and was
+customized. This configuration output contains declarative facts and local
+choices; no i3 executable/library is included. It is distributed under the
 top-level MIT grant to the extent copyright applies to the repository author,
 while any independently copyrightable upstream template fragment retains its
 upstream terms.
+
+(The `nixos-generate-config`-produced `hardware-configuration.nix` files for
+the real hosts live in the private overlay repo, `dotfiles_nix_personal`,
+not here — this repo ships no hosts of its own.)
 
 ## Fetched inputs and plugins
 

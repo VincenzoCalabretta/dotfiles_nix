@@ -1,4 +1,4 @@
-# dotfiles-nix
+# dotfiles_nix
 
 A generic, reusable NixOS/Home Manager module library: terminal, shell, and
 editor configuration, plus a handful of small opt-in NixOS building blocks
@@ -236,5 +236,3 @@ git log --all --stat
   overlay instead, colocated with the host it applies to.
 - CI (in the overlay repo, which owns the runner) runs jobs directly on the
   host without container isolation.
-- The repository has no top-level license file yet; add one before public
-  release.
