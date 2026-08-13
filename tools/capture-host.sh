@@ -14,8 +14,8 @@ Options:
   --generate-hardware     Run nixos-generate-config and use its output
   --full-build            Run nixos-rebuild build to verify the rewritten config
   --yes                   Skip confirmation prompt
-  --base-repo-name <name> Local clone dirname of the public dotfiles-nix base
-                           repo (default: dotfiles-nix). Used to recognize
+  --base-repo-name <name> Local clone dirname of the public dotfiles_nix base
+                           repo (default: dotfiles_nix). Used to recognize
                            imports of ITS modules and rewrite them
                            differently from imports of this repo's own
                            modules — see below.
@@ -42,7 +42,7 @@ HOST=""
 GENERATE_HW=""
 FULL_BUILD=""
 YES=""
-BASE_REPO_NAME="dotfiles-nix"
+BASE_REPO_NAME="dotfiles_nix"
 
 # Module names nixosModules.* actually exports from the base repo's
 # flake.nix — keep in sync with it. Anything else found under

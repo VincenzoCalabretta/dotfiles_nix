@@ -138,8 +138,8 @@ pkgs.testers.nixosTest {
         machine.succeed(
             "printf '{ ... }:\\n{\\n  imports = [\\n"
             "    /home/v/fixture-repo/modules/foo.nix\\n"
-            "    /home/v/dotfiles-nix/modules/wireguard.nix\\n"
-            "    /home/v/dotfiles-nix/modules/hardware.nix\\n"
+            "    /home/v/dotfiles_nix/modules/wireguard.nix\\n"
+            "    /home/v/dotfiles_nix/modules/hardware.nix\\n"
             "  ];\\n}\\n' "
             "> /etc/nixos/configuration.nix"
         )
@@ -148,7 +148,7 @@ pkgs.testers.nixosTest {
         out = machine.succeed("cat /root/fixture-repo/hosts/testhost/configuration.nix")
         assert "../../modules/foo.nix" in out, "this repo's own absolute imports must be rewritten repo-relative"
         assert "inputs.dotfiles.nixosModules.wireguard" in out, "known base-repo modules must be rewritten to inputs.dotfiles.nixosModules.*"
-        assert "/home/v/dotfiles-nix/modules/hardware.nix" in out, "unrecognized base-repo modules must be left untouched rather than silently dropped or guessed at"
+        assert "/home/v/dotfiles_nix/modules/hardware.nix" in out, "unrecognized base-repo modules must be left untouched rather than silently dropped or guessed at"
         assert "Warning" in result, "an unrecognized base-repo module import must print a warning"
 
         # Dirty fixture: a leaked /etc/wireguard/ reference must be rejected.
