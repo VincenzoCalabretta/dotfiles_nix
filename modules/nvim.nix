@@ -22,6 +22,7 @@
     stylua
     rust-analyzer
     clang-tools     # provides clangd
+    nixd            # Nix LSP; also used by opencode (modules/opencode.nix)
   ];
 
   xdg.configFile."nvim".source = ../dotfiles/nvim;

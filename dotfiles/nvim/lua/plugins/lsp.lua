@@ -102,8 +102,12 @@ return {
 
       -- ── 3. Mason: ensure tools are installed ──────────────────────────
       require('mason-tool-installer').setup {
-        -- Added clangd here
-        ensure_installed = { 'lua-language-server','basedpyright', 'ruff', 'stylua', 'rust-analyzer', 'clangd' },
+        -- clangd intentionally NOT managed by mason: on Nix, the mason-built
+        -- binary shadows the Nix-profile clangd on $PATH (mason prepends its
+        -- bin dir) and doesn't know how to find the Nix toolchain's system
+        -- headers, causing spurious errors on every file. Use the
+        -- Nix-profile clangd via an absolute path instead (see below).
+        ensure_installed = { 'lua-language-server','basedpyright', 'ruff', 'stylua', 'rust-analyzer' },
       }
 
       -- ── 4. Helper: resolve .venv python for the current project ───────
@@ -206,16 +210,27 @@ return {
       })
 
       -- Clangd
+      -- Absolute path: avoids mason's bin dir (prepended to $PATH) shadowing
+      -- this with a generic build that can't see the Nix toolchain's headers.
       vim.lsp.config('clangd', {
-        cmd = { 'clangd' },
+        cmd = { vim.fn.expand('~/.nix-profile/bin/clangd') },
         filetypes = { 'c', 'cpp', 'objc', 'objcpp', 'cuda', 'proto' },
         root_markers = { 'compile_commands.json', 'compile_flags.txt', '.git' },
         capabilities = capabilities,
       })
 
+      -- Nixd
+      -- Not mason-managed: installed via Nix (modules/nvim.nix) like clangd.
+      vim.lsp.config('nixd', {
+        cmd = { 'nixd' },
+        filetypes = { 'nix' },
+        root_markers = { 'flake.nix', '.git' },
+        capabilities = capabilities,
+      })
+
 
       -- ── 6. Enable servers ─────────────────────────────────────────────
-      vim.lsp.enable({ 'lua_ls', 'ruff', 'basedpyright', 'rust_analyzer', 'clangd' })
+      vim.lsp.enable({ 'lua_ls', 'ruff', 'basedpyright', 'rust_analyzer', 'clangd', 'nixd' })
 
       -- ── 7. Diagnostics display ────────────────────────────────────────
       vim.diagnostic.config({
