@@ -1,12 +1,28 @@
 { config, lib, ... }:
 
 let
-  inherit (lib) mkEnableOption mkIf;
+  inherit (lib) mkEnableOption mkIf mkOption types;
   cfg = config.dotfiles.nvidia;
 in
 {
   options.dotfiles.nvidia = {
     enable = mkEnableOption "NVIDIA proprietary driver for hybrid Intel/NVIDIA (PRIME offload) laptops";
+
+    intelBusId = mkOption {
+      type = types.str;
+      description = ''
+        Intel iGPU PCI bus ID in `lspci -nn | grep -Ei 'vga|3d'` /
+        NixOS `PCI:bus:device:function` form (e.g. "PCI:0:2:0"). Specific to
+        this machine's hardware topology — has no sane default.
+      '';
+    };
+
+    nvidiaBusId = mkOption {
+      type = types.str;
+      description = ''
+        NVIDIA dGPU PCI bus ID, same form as intelBusId (e.g. "PCI:1:0:0").
+      '';
+    };
   };
 
   config = mkIf cfg.enable {
@@ -36,10 +52,8 @@ in
           enableOffloadCmd = true; # provides the `nvidia-offload` wrapper
         };
 
-        # Intel iGPU at 0000:00:02.0, NVIDIA dGPU at 0000:01:00.0
-        # (`lspci -nn | grep -Ei 'vga|3d'`). Update if hardware changes.
-        intelBusId = "PCI:0:2:0";
-        nvidiaBusId = "PCI:1:0:0";
+        intelBusId = cfg.intelBusId;
+        nvidiaBusId = cfg.nvidiaBusId;
       };
     };
   };

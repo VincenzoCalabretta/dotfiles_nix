@@ -38,8 +38,18 @@ pkgs.testers.nixosTest {
     environment.systemPackages = [ pkgs.git ];
 
     dotfiles.wireguard.enable = true;
-    dotfiles.wireshark.enable = true;
-    dotfiles.forgejo-runner.enable = true;
+    dotfiles.wireshark = {
+      enable = true;
+      user = "v";
+    };
+    dotfiles.netdebug = {
+      enable = true;
+      user = "v";
+    };
+    dotfiles.forgejo-runner = {
+      enable = true;
+      url = "https://10.10.0.101:3000";
+    };
 
     system.stateVersion = "26.05";
   };
@@ -114,17 +124,32 @@ pkgs.testers.nixosTest {
         machine.succeed("cp ${capture-host-script} /root/fixture-repo/tools/capture-host.sh")
         machine.succeed("chmod +x /root/fixture-repo/tools/capture-host.sh")
 
-        # Clean fixture: portable import rewrite should apply, guardrail should pass.
+        # Clean fixture, three import kinds:
+        #   1. this repo's own module (matched by REPO_BASENAME "fixture-repo",
+        #      even though the path below isn't its real location — the
+        #      rewrite matches on directory *name*, not an existing path)
+        #      -> repo-relative rewrite
+        #   2. a module the base repo actually exports as a nixosModule
+        #      -> inputs.dotfiles.nixosModules.<name>
+        #   3. a module under the base repo's path that ISN'T in its
+        #      exported nixosModules (hardware.nix is deliberately private)
+        #      -> left untouched, with a warning, not guessed at
         machine.succeed("mkdir -p /etc/nixos")
         machine.succeed(
-            "printf '{ ... }:\\n{\\n  imports = [ /home/v/dotfiles-nix/modules/foo.nix ];\\n}\\n' "
+            "printf '{ ... }:\\n{\\n  imports = [\\n"
+            "    /home/v/fixture-repo/modules/foo.nix\\n"
+            "    /home/v/dotfiles-nix/modules/wireguard.nix\\n"
+            "    /home/v/dotfiles-nix/modules/hardware.nix\\n"
+            "  ];\\n}\\n' "
             "> /etc/nixos/configuration.nix"
         )
         machine.succeed("rm -f /etc/nixos/hardware-configuration.nix")
-        machine.succeed("cd /root/fixture-repo && ./tools/capture-host.sh --host testhost --yes")
+        result = machine.succeed("cd /root/fixture-repo && ./tools/capture-host.sh --host testhost --yes")
         out = machine.succeed("cat /root/fixture-repo/hosts/testhost/configuration.nix")
-        assert "../../modules/foo.nix" in out, "absolute imports must be rewritten repo-relative"
-        assert "/home/v/dotfiles-nix" not in out, "no absolute dotfiles-nix path should survive the rewrite"
+        assert "../../modules/foo.nix" in out, "this repo's own absolute imports must be rewritten repo-relative"
+        assert "inputs.dotfiles.nixosModules.wireguard" in out, "known base-repo modules must be rewritten to inputs.dotfiles.nixosModules.*"
+        assert "/home/v/dotfiles-nix/modules/hardware.nix" in out, "unrecognized base-repo modules must be left untouched rather than silently dropped or guessed at"
+        assert "Warning" in result, "an unrecognized base-repo module import must print a warning"
 
         # Dirty fixture: a leaked /etc/wireguard/ reference must be rejected.
         machine.succeed("rm -rf /root/fixture-repo/hosts/testhost")

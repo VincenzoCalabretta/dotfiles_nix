@@ -1,20 +1,23 @@
 { config, pkgs, lib, ... }:
 
+# Generic, reusable Home Manager profile: terminal/editor/shell tooling with
+# no personal packages, private flake inputs, or baked-in username/home
+# directory. Exposed as `homeManagerModules.base` in flake.nix so any
+# consuming flake (this repo's own home-personal.nix, or an external one) can
+# import it and layer its own home.username/homeDirectory and machine- or
+# person-specific extras (opencode/claude, personal packages, i3 exec'd apps,
+# ...) on top. See home.nix.example for how an external flake does this.
 {
   imports = [
     ./modules/tmux.nix
     ./modules/nvim.nix
     ./modules/zsh.nix
+    ./modules/bash.nix
     ./modules/lf.nix
     ./modules/i3.nix
     ./modules/ghostty.nix
-    ./modules/opencode.nix
-    ./modules/claude.nix
     ./modules/rust.nix
   ];
-
-  home.username = "v";
-  home.homeDirectory = "/home/v";
 
   # Match the release you're installing home-manager from. Update in lockstep
   # with the nixpkgs branch pinned in flake.nix.
@@ -77,11 +80,6 @@
     gnumake
     pkg-config           # locates library compile/link flags for builds
     git
-
-    # Programs
-    keepassxc             # password manager
-    codex                  # OpenAI's CLI coding agent
-    chromium               # web browser
   ];
 
   fonts.fontconfig.enable = true;

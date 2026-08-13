@@ -4,25 +4,17 @@ on:
   pull_request:
   workflow_dispatch:
 
+# This repo ships only the reusable module library (nixosModules,
+# homeManagerModules.base) plus generic example/check outputs — no personal
+# hosts or private inputs. `nix flake check` alone (home-manager-build
+# against the placeholder "example" profile, deploy-tools, checklist-vm)
+# proves the whole thing evaluates and activates. The concrete personal
+# deployment (hosts, private local-AI stack) has its own CI in the private
+# overlay repo.
 jobs:
   checks:
     runs-on: [self-hosted]
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - run: nix flake check 2>&1 | tail -20
-      - run: nix run github:nix-community/home-manager -- build --flake .#v 2>&1 | tail -5
-      - name: CHECKLIST.md coverage (every item classified manual/ci/test)
-        run: nix build .#checks.x86_64-linux.checklist-coverage -L
-      - name: CHECKLIST.md VM test (proves the automatable steps actually work)
-        run: nix build .#checks.x86_64-linux.checklist-vm -L 2>&1 | tail -80
-
-  system-builds:
-    runs-on: [self-hosted]
-    timeout-minutes: 180
-    steps:
-      - uses: actions/checkout@v4
-      - run: nix build .#nixosConfigurations.server.config.system.build.toplevel 2>&1 | tail -10
-      - run: nix build .#nixosConfigurations.home.config.system.build.toplevel 2>&1 | tail -10
-      - run: nix run .#server-build 2>&1 | tail -5
-      - run: nix run .#home-build 2>&1 | tail -5
+      - run: nix flake check 2>&1 | tail -40

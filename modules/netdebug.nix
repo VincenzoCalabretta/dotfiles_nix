@@ -1,19 +1,32 @@
-{ pkgs, ... }:
+{ config, lib, pkgs, ... }:
 
+let
+  inherit (lib) mkEnableOption mkIf mkOption types;
+  cfg = config.dotfiles.netdebug;
+in
 {
-  # Packet capture for debugging the AES-ZUB-1CG board's Ethernet (GEM2/RGMII)
-  # bring-up over the USB-Ethernet adapter. NOPASSWD is scoped to tcpdump only.
-  environment.systemPackages = [ pkgs.tcpdump ];
+  options.dotfiles.netdebug = {
+    enable = mkEnableOption "passwordless tcpdump for one user (e.g. for debugging Ethernet bring-up on embedded hardware)";
 
-  security.sudo.extraRules = [
-    {
-      users = [ "v" ];
-      commands = [
-        {
-          command = "/run/current-system/sw/bin/tcpdump";
-          options = [ "NOPASSWD" ];
-        }
-      ];
-    }
-  ];
+    user = mkOption {
+      type = types.str;
+      description = "User granted NOPASSWD sudo for tcpdump only.";
+    };
+  };
+
+  config = mkIf cfg.enable {
+    environment.systemPackages = [ pkgs.tcpdump ];
+
+    security.sudo.extraRules = [
+      {
+        users = [ cfg.user ];
+        commands = [
+          {
+            command = "/run/current-system/sw/bin/tcpdump";
+            options = [ "NOPASSWD" ];
+          }
+        ];
+      }
+    ];
+  };
 }

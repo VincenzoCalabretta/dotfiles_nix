@@ -1,99 +1,124 @@
 # dotfiles-nix
 
-This repository is the declarative configuration used for my daily NixOS
-development environment. One flake owns the user profile, two complete NixOS
-hosts, terminal/editor/shell configuration, networking, a self-hosted CI
-runner, and a local LLM-assisted development stack.
+A generic, reusable NixOS/Home Manager module library: terminal, shell, and
+editor configuration, plus a handful of small opt-in NixOS building blocks
+(WireGuard, a Forgejo Actions runner, hybrid-GPU NVIDIA support, packet
+capture policy). No personal packages, no private flake inputs, no baked-in
+username, home directory, or host identity.
 
-The goal is not to provide a universal NixOS distribution. It is a concrete,
-versioned example of how I make a development workstation reproducible: the
-configuration files and every tool they invoke are deployed together, host
-changes are built before they are switched, secrets remain outside the Nix
-store, and the manual deployment contract is exercised by CI and a NixOS VM
-test.
-
-## Highlights
-
-- **Single flake, two layers.** Home Manager owns the unprivileged development
-  environment; NixOS modules own boot, hardware, networking, GPU, privileged
-  packet capture, and services.
-- **Two versioned hosts.** `home` is a graphical Intel/NVIDIA development
-  laptop; `server` is a minimal headless host. Both share a small NixOS base.
-- **Editor and debugger environment.** Neovim, language servers, Bazel-aware
-  navigation, custom DAP modules, GDB pretty-printers, and tmux debugging
-  helpers are deployed as one closure.
-- **Local AI stack.** A llama.cpp inference service, CPU embedding service,
-  SearXNG, OpenCode, five MCP servers, and automatic repository reindexing are
-  wired with exact Nix-store paths.
-- **Operational guardrails.** WireGuard keys and runner credentials stay in
-  root-owned files outside the repository. Host capture refuses to persist
-  WireGuard references, and every item in `CHECKLIST.md` must be classified as
-  manual, CI-proven, or VM-tested.
-- **Self-hosted CI.** A Forgejo Actions runner executes directly on the NixOS
-  host with a warm Nix store, while the flake verifies both system closures,
-  the Home Manager activation, deployment tools, checklist coverage, and the
-  secret-provisioning VM scenario.
+This repo does not itself deploy anything. It exists to be imported: a
+consuming flake defines its own hosts and its own Home Manager profile,
+pulling in whichever pieces of this library it wants — see
+`home.nix.example` and `configuration.nix.example`. My own personal
+deployment (real hosts, private local-AI stack, personal packages) lives in
+a separate private overlay repo that imports this one; see "Design" below
+for why the split exists.
 
 ## What the flake exports
 
 | Output | Purpose |
 |---|---|
-| `homeConfigurations.v` | Home Manager profile for user `v` |
-| `nixosConfigurations.home` | Full graphical workstation system closure |
-| `nixosConfigurations.server` | Full headless server system closure |
-| `nixosModules.wireguard` | Opt-in `wg-quick` interface module with out-of-store config files |
-| `nixosModules.forgejo-runner` | Opt-in host-executed Forgejo Actions runner |
-| `packages.x86_64-linux.activate` | Home Manager activation package |
-| `apps.x86_64-linux.{home,server}-{build,switch}` | Build-only and live-switch entry points |
-| `apps.x86_64-linux.deploy-host` | Build, switch, activate Home Manager, and set the shell |
-| `apps.x86_64-linux.capture-host` | Snapshot live `/etc/nixos` state into a host directory |
-| `checks.x86_64-linux.*` | Host closures, Home Manager, tools, checklist coverage, and VM tests |
+| `homeManagerModules.base` | Generic Home Manager profile: tmux, Neovim, zsh, bash, `lf`, i3, ghostty, Rust. No personal packages, private inputs, or username/homeDirectory. |
+| `homeConfigurations.example` | `homeManagerModules.base` alone, under a placeholder identity — proves it evaluates and activates with zero private inputs reachable. |
+| `nixosModules.nixos-base` | Shared NixOS baseline (unfree packages, flakes enabled, zsh, OpenSSH). |
+| `nixosModules.wireguard` | Opt-in `wg-quick` interface module with out-of-store config files. |
+| `nixosModules.forgejo-runner` | Opt-in host-executed Forgejo Actions runner. |
+| `nixosModules.nvidia` | Opt-in hybrid Intel/NVIDIA PRIME-offload configuration. |
+| `nixosModules.wireshark` | Opt-in passwordless packet capture for one user. |
+| `nixosModules.netdebug` | Opt-in scoped passwordless `tcpdump` for one user. |
+| `packages.x86_64-linux.deploy-host` | Build, switch, activate Home Manager, and set the shell for *any* flake passed via `--flake` |
+| `packages.x86_64-linux.capture-host` | Snapshot live `/etc/nixos` state into a host directory |
+| `packages.x86_64-linux.set-default-shell` | Set the login shell to zsh |
+| `checks.x86_64-linux.*` | Home Manager base-profile build, deployment tools, and a NixOS VM test of the shared modules |
 
-The flake is currently x86_64-Linux-specific. User name, home directory,
-hardware identifiers, encrypted-volume UUIDs, GPU bus IDs, network addresses,
-and service endpoints are personal configuration and must be reviewed before
-using the repository on another machine.
+The flake is x86_64-Linux-specific. `deploy-host` and `capture-host` are
+generic — they take `--flake <path>` — so a consuming flake reuses them
+directly instead of redefining its own build/switch entry points.
+
+## Design: why this repo has no hosts or private inputs
+
+This started as one repo with everything: two real NixOS hosts, a private
+local-AI stack (`opencode`/`claude` MCP wiring pulling in flake inputs from
+a personal Forgejo instance), and personal packages, all under one
+`homeConfigurations."v"`. That made it impossible to reuse on a machine that
+must not fetch that private infrastructure — a work laptop, for instance,
+with its own username and no route to a personal Forgejo.
+
+The fix was to make this repo the generic, private-infra-free half — a
+module *library*, not a deployment — and move everything personal (hosts,
+private inputs, opencode/claude, personal packages) into a separate private
+overlay repo that imports it via `inputs.dotfiles`. Concretely:
+
+- `home.nix` (this repo) has no `home.username`/`home.homeDirectory` and no
+  personal packages; it's exported as `homeManagerModules.base`.
+- `modules/opencode.nix`, `modules/claude.nix`, and `modules/llama-relay.nix`
+  — all coupled to the private `llama-server`/`opencode-mcp-tools` flake
+  inputs and a personal Forgejo — live in the overlay repo, not here.
+- `modules/hardware.nix` (this laptop's own audio/USB-device quirks) also
+  lives in the overlay, colocated with the one host it applies to — it was
+  never a reusable module, just factored into its own file.
+- The real `hosts/home`, `hosts/server` configurations, with their real
+  hostnames, locale, disk UUIDs, and usernames, live in the overlay.
+- `homeConfigurations.example` and `checks.home-manager-build` in *this*
+  repo prove the base profile evaluates and activates standalone, with zero
+  private inputs reachable — that's the actual portability guarantee, not
+  just a claim in prose.
+
+A work-machine deployment is then just another consumer of this same
+library: its own flake (or another spot in the overlay repo) sets its own
+`home.username`/`homeDirectory`/hostname and imports only the modules it
+wants, with no path to the private inputs at all.
 
 ## Repository layout
 
 ```text
 .
-├── flake.nix                     # inputs, host/profile outputs, apps and checks
-├── flake.lock                    # exact nixpkgs, Home Manager and service inputs
-├── home.nix                      # shared user profile and Home Manager modules
-├── hosts/
-│   ├── home/                     # graphical workstation configuration + hardware
-│   └── server/                   # headless server configuration + hardware
+├── flake.nix                     # inputs, module-library outputs, generic deploy tools
+├── flake.lock                    # exact nixpkgs and Home Manager pins
+├── home.nix                      # generic base profile (homeManagerModules.base)
+├── home.nix.example              # template for consuming homeManagerModules.base
+├── configuration.nix.example     # template for consuming nixosModules.*
 ├── modules/
 │   ├── nixos-base.nix            # shared NixOS baseline
-│   ├── hardware.nix              # laptop power/firmware/udev and nix-ld support
-│   ├── nvidia.nix                # hybrid-GPU PRIME offload configuration
+│   ├── nvidia.nix                # hybrid-GPU PRIME offload (bus IDs are options, no default)
 │   ├── wireguard.nix             # out-of-store wg-quick service definitions
 │   ├── forgejo-runner.nix        # stable runner user, service and host tools
-│   ├── wireshark.nix             # privileged capture policy
-│   ├── netdebug.nix              # constrained passwordless tcpdump policy
+│   ├── wireshark.nix             # privileged capture policy (user is an option)
+│   ├── netdebug.nix              # scoped passwordless tcpdump policy (user is an option)
 │   └── {nvim,tmux,zsh,...}.nix   # Home Manager packages and deployed configs
 ├── dotfiles/
 │   ├── nvim/                     # Lua config, DAP, LSP, pickers and GDB helpers
 │   ├── tmux/                     # session/debug/navigation helpers
-│   ├── zsh/                      # shell, aliases and plugins
-│   ├── i3/, ghostty/, lf/        # desktop/terminal/file-manager configuration
-│   └── opencode/                 # plugin and detailed local-AI documentation
+│   ├── zsh/, bash/                # shell, aliases and plugins
+│   └── i3/, ghostty/, lf/         # desktop/terminal/file-manager configuration
 ├── tools/
-│   ├── deploy-host.sh            # controlled live deployment sequence
+│   ├── deploy-host.sh            # controlled live deployment sequence (generic, takes --flake)
 │   ├── capture-host.sh           # portable host snapshot + secret guardrail
-│   └── check-checklist-coverage.sh
-├── tests/checklist-vm.nix        # isolated NixOS integration test
-├── CHECKLIST.md                  # human deployment and secret-provisioning contract
-└── .forgejo/workflows/ci.yml     # two-job self-hosted CI workflow
+│   └── check-checklist-coverage.sh  # generic CHECKLIST.md marker checker
+├── tests/checklist-vm.nix        # isolated NixOS integration test of the shared modules
+└── .forgejo/workflows/ci.yml     # self-hosted CI: `nix flake check`
 ```
 
-## Home Manager profile
+## Home Manager profile (`homeManagerModules.base`)
 
-`home.nix` imports the terminal, shell, editor, file manager, window manager,
-local-AI, Claude, and Rust modules. The configuration deliberately deploys
-both a program and the runtime dependencies referenced by its scripts; a tmux
-binding or Neovim tool should not depend on an untracked host package.
+Terminal, shell, editor, file manager, window manager, and Rust modules,
+with no personal packages, no private flake inputs, and no baked-in
+`home.username`/`home.homeDirectory`. A consumer imports it and layers its
+own identity and extras on top — see `home.nix.example`:
+
+```nix
+{ pkgs, inputs, ... }:
+{
+  imports = [ inputs.dotfiles.homeManagerModules.base ];
+  home.username = "you";
+  home.homeDirectory = "/home/you";
+  home.packages = with pkgs; [ /* whatever's specific to this machine */ ];
+}
+```
+
+The configuration deliberately deploys both a program and the runtime
+dependencies referenced by its scripts; a tmux binding or Neovim tool should
+not depend on an untracked host package.
 
 ### Neovim
 
@@ -115,275 +140,86 @@ Notable local code includes:
 The tmux configuration provides i3-like navigation, project session creation,
 debug-session helpers, display toggles, and command/language cheat sheets.
 `home.sessionPath` exposes the helper directory so both tmux and i3 can invoke
-scripts by name. Because this machine starts X with `startx`, Home Manager also
-generates `.xinitrc` to load its session variables before `exec i3`.
+scripts by name. `.xinitrc` is generated to load Home Manager's session
+variables before `exec i3`, for setups that start X manually via `startx`.
 
-Zsh is deployed with Oh My Zsh, syntax highlighting, autosuggestions, vi-mode,
-and repository-local aliases. Ghostty, `lf`, i3, fonts, clipboard tools, archive
-tools, compiler basics, Git, and daily CLI utilities are part of the same
-activation closure.
+Zsh and Bash are both deployed (Oh My Zsh / ble.sh respectively, syntax
+highlighting, autosuggestions, vi-mode, and repository-local aliases).
+Ghostty, `lf`, i3, fonts, clipboard tools, archive tools, compiler basics,
+Git, and daily CLI utilities are part of the same activation closure.
 
-### Local LLM and MCP toolchain
+## NixOS modules
 
-`modules/opencode.nix` builds two flake inputs and embeds their exact Nix-store
-paths into the generated OpenCode configuration:
+| Module | What it needs from the consumer |
+|---|---|
+| `nixos-base` | Nothing — drop it in as-is. |
+| `wireguard` | Optionally override `dotfiles.wireguard.interfaces`; config files stay outside the Nix store (default paths: `/etc/wireguard/{wg1,wg3}.conf`). |
+| `forgejo-runner` | `dotfiles.forgejo-runner.url` (no default — must be set). Registration token and SSH deploy key are provisioned out of band. |
+| `nvidia` | `dotfiles.nvidia.intelBusId`/`.nvidiaBusId` (no default — `lspci -nn \| grep -Ei 'vga\|3d'` on the actual machine). |
+| `wireshark` | `dotfiles.wireshark.user` (no default). |
+| `netdebug` | `dotfiles.netdebug.user` (no default). |
 
-- a llama.cpp OpenAI-compatible inference server at `127.0.0.1:8080/v1`;
-- a CPU embedding server for semantic repository indexing;
-- SearXNG-backed web search;
-- code search, test runner, grammar/structured-output, and repository-index
-  MCP servers; and
-- a JavaScript plugin that incrementally reindexes a repository after file
-  modifications.
+None of these hardcode a username, host identity, or secret — see
+`configuration.nix.example` for how a consumer wires them up:
 
-The `opencode` wrapper starts inference and embedding systemd user services,
-runs the real CLI, and stops the services only after the last concurrent
-OpenCode process exits. The model is not started at login because it occupies
-most of the configured laptop GPU's VRAM. SearXNG remains explicitly on-demand:
-
-```sh
-systemctl --user start opencode-searxng
-opencode
+```nix
+{ pkgs, inputs, ... }:
+{
+  imports = [ inputs.dotfiles.nixosModules.wireguard ];
+  dotfiles.wireguard.enable = true;
+  # ...
+}
 ```
 
-The reindex-on-save plugin uses `setsid` plus an unreferenced child process so
-an index update survives short-lived `opencode run` sessions. MCP binaries are
-published to the generated configuration as Nix-store paths rather than
-looked up from mutable sibling repositories.
-
-See [`dotfiles/opencode/README.md`](dotfiles/opencode/README.md) for service,
-model, MCP, and reindexing details.
-
-## NixOS hosts and system modules
-
-| Host | Intended role | Notable modules |
-|---|---|---|
-| `home` | Development laptop/workstation | i3/X11, hybrid NVIDIA PRIME, power management, WireGuard, Wireshark, network debugging, Forgejo runner |
-| `server` | Headless NixOS server | shared base, OpenSSH, WireGuard, minimal package set |
-
-Both hosts use systemd-boot and current pinned kernel packages. Their checked-in
-`hardware-configuration.nix` files are machine-specific; they must never be
-copied blindly to another system.
-
-### WireGuard secret boundary
-
-The WireGuard module owns service declarations but never imports private keys
-into the Nix store. By default it expects complete, root-owned mode-0600
-`wg-quick` files at:
-
-- `/etc/wireguard/wg1.conf`, enabled at boot; and
-- `/etc/wireguard/wg3.conf`, available for manual activation.
-
-Consumers can override `dotfiles.wireguard.interfaces.<name>.configFile` and
-`.autostart`. The config file must contain both `[Interface]` and `[Peer]`
-sections and remain outside the repository.
-
-### Forgejo Actions runner
-
-The runner module creates a stable `forgejo-runner` system user rather than a
-dynamic user so it can own a persistent SSH deploy key and participate in the
-Nix trusted-user policy. Jobs run directly on the host, not in Docker; that
-improves cache reuse but means workflow code has the privileges of the runner
-account.
-
-Registration tokens live in
-`/etc/forgejo-runner/registration-token.env`, and the SSH key lives below
-`/var/lib/forgejo-runner/.ssh/`. Both are provisioned out of band. The exact
-order and permissions are maintained in [`CHECKLIST.md`](CHECKLIST.md).
-
-## Publication and portability note
-
-The checked-in flake currently fetches `llama-server` and
-`opencode-mcp-tools` from a private Forgejo address. A public clone cannot
-evaluate all outputs unless it can reach those inputs. Before presenting this
-as a generally buildable public repository, either publish those dependencies,
-replace their URLs with public mirrors, or make the AI module/inputs optional.
-
-Likewise, the repository is configured for user `v` at `/home/v`. Forks should
-parameterize or update `home.username`, `home.homeDirectory`, host users,
-hardware files, GPU identifiers, WireGuard interfaces, Forgejo endpoints, and
-the selected local model before activation.
-
 ## Safe evaluation and testing
-
-The following commands do not switch the running system:
 
 ```sh
 # Parse/evaluate every flake output without building closures.
 nix flake check --no-build
 
-# Build the Home Manager activation closure.
+# Build the base Home Manager profile under a placeholder identity.
 nix build .#checks.x86_64-linux.home-manager-build
 
-# Build both complete NixOS system closures.
-nix build .#nixosConfigurations.home.config.system.build.toplevel
-nix build .#nixosConfigurations.server.config.system.build.toplevel
-
-# Prove every checklist item is classified.
-nix build .#checks.x86_64-linux.checklist-coverage -L
-
-# Run the NixOS VM integration test for automatable deployment/secret steps.
+# Run the NixOS VM integration test for the shared modules (wireguard,
+# forgejo-runner, netdebug, wireshark) — proves they produce the state their
+# option docs promise, independent of any concrete host.
 nix build .#checks.x86_64-linux.checklist-vm -L
 ```
 
-The complete local gate is:
-
-```sh
-nix flake check
-```
-
-It builds the Home Manager activation, both NixOS systems, deployment tools,
-checklist coverage checker, and VM test. Expect a substantial first build.
-Evaluation requires all locked inputs—including the private local-AI inputs—to
-be reachable or already present in the Nix store.
+The complete local gate is `nix flake check` — it requires no private
+inputs and no network access beyond the standard Nix substituters.
 
 ## CI
 
-Every push and pull request runs two Forgejo jobs on the self-hosted runner:
+Every push and pull request runs `nix flake check` on a self-hosted Forgejo
+Actions runner (deployed by the private overlay repo's `home` host, via this
+repo's own `nixosModules.forgejo-runner`). See `.forgejo/workflows/ci.yml`.
 
-| Job | Checks |
-|---|---|
-| `checks` | `nix flake check`, explicit Home Manager build, checklist classification, and checklist VM test |
-| `system-builds` | full `home` and `server` closures plus smoke builds of both build-only apps |
+## Adapting / consuming the library
 
-The CI host executes jobs directly and has a warm Nix store. A local
-`nix flake check` exercises the same flake checks, while the workflow keeps
-system builds as a separately visible job with a longer timeout.
+- **Just want the terminal/editor/shell profile?** Import
+  `homeManagerModules.base` from your own flake (see `home.nix.example`).
+  No fork needed.
+- **Want the NixOS building blocks (WireGuard, Forgejo runner, NVIDIA
+  PRIME, packet-capture policy)?** Import the relevant `nixosModules.*` from
+  your own host configuration (see `configuration.nix.example`) and set
+  whatever options that module requires (see the table above).
+- **Want to see a complete, real deployment built this way** — hosts,
+  private local-AI stack, personal packages, secrets provisioning checklist
+  — that's the private overlay repo, not this one.
 
-## Installing the profile on a new machine
-
-This section describes the existing personal deployment. Read
-[`CHECKLIST.md`](CHECKLIST.md) before changing a live machine.
-
-Prerequisites:
-
-- NixOS with `nix-command` and `flakes` enabled;
-- a checkout whose private flake inputs are reachable;
-- reviewed, machine-correct host and hardware configuration; and
-- secrets provisioned outside the checkout.
-
-First Home Manager activation:
-
-```sh
-git clone <repository-url> ~/dotfiles-nix
-cd ~/dotfiles-nix
-
-# Rename any conflicting unmanaged file to *.backup before linking the
-# declarative version.
-nix run github:nix-community/home-manager -- \
-  switch -b backup --flake .#v
-```
-
-Subsequent user-profile updates:
-
-```sh
-home-manager switch --flake ~/dotfiles-nix#v
-```
-
-Home Manager copies `dotfiles/**` through the Nix store. An edit becomes live
-only after another activation. The exception is an intentionally configured
-out-of-store symlink, which this repository does not use by default.
-
-## Building and deploying a host
-
-Build first without mutating the live system:
-
-```sh
-nix run ~/dotfiles-nix#home-build
-nix run ~/dotfiles-nix#server-build
-```
-
-The complete deployment tool then:
-
-1. builds `nixosConfigurations.<host>`;
-2. runs `sudo nixos-rebuild switch`;
-3. activates the Home Manager package; and
-4. selects zsh as the login shell if needed.
-
-```sh
-nix run ~/dotfiles-nix#deploy-host -- --host home
-nix run ~/dotfiles-nix#deploy-host -- --host server
-```
-
-Optional flags are `--skip-build`, `--skip-home`, and `--no-shell`. Skipping
-the build removes the pre-switch safety gate and should be reserved for a
-closure already built and reviewed in the same state.
-
-System-only entry points are also available:
-
-```sh
-nix run ~/dotfiles-nix#home-switch
-nix run ~/dotfiles-nix#server-switch
-```
-
-These commands invoke `sudo` and change the live operating system. Do not run
-them merely to test a public clone.
-
-## Capturing live host state
-
-`capture-host` copies the live NixOS configuration into `hosts/<name>/`,
-rewrites known absolute checkout imports to repository-relative paths, records
-the active generation, and evaluates the resulting host output:
-
-```sh
-nix run ~/dotfiles-nix#capture-host
-nix run ~/dotfiles-nix#capture-host -- --host server
-nix run ~/dotfiles-nix#capture-host -- --generate-hardware
-nix run ~/dotfiles-nix#capture-host -- --full-build
-```
-
-It intentionally ignores comments while rewriting the live configuration and
-refuses to leave captured files behind if they reference `/etc/wireguard/`.
-The tool cannot determine whether arbitrary unrelated literals are secrets, so
-the generated diff still requires human review:
-
-```sh
-git diff --stat
-git diff -- hosts/<host>
-```
-
-Only regenerate hardware configuration after a hardware, disk, partition, or
-boot-layout change.
-
-## Rollback
-
-NixOS keeps previous generations. For a problem discovered immediately after
-a live switch:
-
-```sh
-sudo nixos-rebuild switch --rollback
-```
-
-If a generation prevents boot, select an earlier generation in systemd-boot,
-then make the rollback persistent and correct the checked-in configuration
-before attempting another switch. Home Manager generations can be inspected
-and rolled back independently with `home-manager generations`.
-
-## Adapting the repository
-
-At minimum, a fork should review:
-
-1. `home.nix`: user name, home directory, package policy and imported modules;
-2. `hosts/*/configuration.nix`: host name, locale, users, boot, filesystems,
-   graphical stack and enabled opt-in modules;
-3. `hosts/*/hardware-configuration.nix`: regenerate on the actual target;
-4. `modules/nvidia.nix` and `modules/hardware.nix`: laptop/GPU-specific IDs
-   and udev/power policy;
-5. `modules/wireguard.nix`: desired interfaces and out-of-store file paths;
-6. `modules/forgejo-runner.nix`: URL, labels, capacity and certificate policy;
-7. `modules/opencode.nix`: public input sources, model, GPU/VRAM assumptions,
-   endpoint, context limits and tool permissions; and
-8. `flake.nix`: supported systems, input URLs, profile name and exposed hosts.
-
-The OpenCode configuration currently sets its tool permission policy to
-`allow` for a trusted single-user machine. That is a material security choice;
-do not copy it unchanged to a shared workstation or untrusted automation host.
+The `nvidia`/`wireshark`/`netdebug`/`forgejo-runner` modules intentionally
+have no defaults for machine-specific values (bus IDs, usernames, URLs) —
+evaluation fails loudly if you enable one without setting them, rather than
+silently reusing someone else's laptop's values.
 
 ## Secret handling
 
 No private WireGuard keys, Forgejo registration tokens, or SSH private keys
-should be committed. Before publication, review tracked content and history in
-addition to relying on `.gitignore`:
+should ever be committed here — the modules in this repo are specifically
+designed so that's structurally true (they only take *paths* to secrets, and
+those default paths point outside the Nix store). Still, before publishing
+any change, review tracked content and history:
 
 ```sh
 git grep -n -I -E \
@@ -391,20 +227,14 @@ git grep -n -I -E \
 git log --all --stat
 ```
 
-Hardware UUIDs, host names, local IPs, and public keys are not authentication
-secrets, but they are still personal infrastructure metadata and should be
-published intentionally.
-
 ## Known limitations
 
 - Only x86_64 Linux is exported.
-- The profile and host definitions are hard-coded for one user and two
-  machines rather than parameterized as a reusable library.
-- Two flake inputs and the Forgejo runner default to private infrastructure.
-- The desktop configuration assumes X11/i3 started through `startx`, hybrid
-  NVIDIA hardware, and specific encrypted-disk layout.
-- CI runs jobs directly on the host without container isolation.
-- The local AI configuration assumes a particular 8 GB NVIDIA GPU budget and
-  grants OpenCode broad local tool permissions.
+- `modules/hardware.nix`-style machine-specific quirks don't belong in this
+  repo by design — if you're forking a module and it turns out to encode a
+  specific machine's hardware, that's a sign it should live in your own
+  overlay instead, colocated with the host it applies to.
+- CI (in the overlay repo, which owns the runner) runs jobs directly on the
+  host without container isolation.
 - The repository has no top-level license file yet; add one before public
   release.

@@ -10,8 +10,11 @@ in
 
     url = mkOption {
       type = types.str;
-      default = "https://10.10.0.101:3000";
-      description = "Base URL of your Forgejo instance.";
+      description = ''
+        Base URL of your Forgejo instance. No default — this is
+        infrastructure-specific and must be set explicitly by the consuming
+        host configuration.
+      '';
     };
 
     name = mkOption {

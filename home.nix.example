@@ -1,0 +1,32 @@
+# Paste-ready Home Manager configuration for an external flake.
+# See home.nix for the reusable base profile and home-personal.nix for a
+# concrete example of layering personal/private extras on top of it.
+#
+# This file expects your flake to define an `inputs.dotfiles` input pointing
+# at this repository, and to build it with:
+#
+#   homeConfigurations."<you>" = home-manager.lib.homeManagerConfiguration {
+#     inherit pkgs;
+#     modules = [ ./home.nix ];   # this file
+#   };
+
+{ pkgs, inputs, ... }:
+
+{
+  imports = [
+    inputs.dotfiles.homeManagerModules.base
+  ];
+
+  home.username = "you";
+  home.homeDirectory = "/home/you";
+
+  # home.stateVersion is already pinned by homeManagerModules.base; override
+  # it here only if you're intentionally tracking a different release.
+
+  # Add whatever is specific to this machine/person here — e.g. a work
+  # package set, a different terminal, or nothing at all if the base
+  # profile is enough.
+  home.packages = with pkgs; [
+    # ...
+  ];
+}

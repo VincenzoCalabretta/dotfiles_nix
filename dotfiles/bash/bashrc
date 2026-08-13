@@ -1,0 +1,114 @@
+# Bash counterpart to ../zsh/zshrc — same prompt, history, vi-mode, and
+# aliases, adapted to bash's readline/ble.sh instead of zsh's ZLE.
+
+# ble.sh must be sourced as close to the top of .bashrc as possible (its own
+# requirement). It's the closest bash analogue to zsh-autosuggestions +
+# zsh-syntax-highlighting combined (both come from one package), and also
+# provides the vi keymap used below in place of zsh-vi-mode.
+# ble.sh's own install dir (~/.config/bash/blesh) is a symlink into the
+# read-only Nix store, so it can't hold ble.sh's cache; make sure
+# XDG_CACHE_HOME exists first so ble.sh picks that writable location instead
+# of failing over to (and erroring on) its own install dir.
+if [[ $- == *i* ]]; then
+    mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}"
+    source "$HOME/.config/bash/blesh/ble.sh" --noattach
+fi
+
+# ---- From the Backup (mirrors zshrc's history block) ----
+HISTFILE=~/.histfile
+HISTSIZE=1000000
+HISTFILESIZE=1000000
+# Shared with zsh's HISTFILE above, across many terminals — never truncate it.
+shopt -s histappend
+shopt -s autocd
+# Closest bash analogue to zsh's extendedglob (different syntax, same idea:
+# richer glob patterns than the POSIX default).
+shopt -s extglob
+
+# Programmable completion (bash's compinit equivalent) — symlinked in by
+# modules/bash.nix from the bash-completion package.
+if [[ -r "$HOME/.config/bash/bash-completion/bash_completion" ]]; then
+    source "$HOME/.config/bash/bash-completion/bash_completion"
+fi
+
+# Show current git branch (empty outside a repo).
+function _v_git_branch() {
+    git symbolic-ref --short HEAD 2>/dev/null
+}
+
+set -o vi
+bleopt default_keymap=vi 2>/dev/null
+# Off by default: without it, ble.sh only redraws its separate "-- INSERT --"
+# status line on a vi mode change, not the PS1 prompt itself (\q{...} below
+# would otherwise sit stale until the next new command line).
+bleopt keymap_vi_mode_update_prompt=1 2>/dev/null
+
+# Trailing `$` color reflects vi mode: green in insert, red in normal —
+# mirrors zshrc's VIM_PROMPT_COLOR/zle-keymap-select trick. ble.sh's prompt
+# engine re-evaluates custom \q{...} escapes on every keystroke (like zsh's
+# ZLE + PROMPT_SUBST), so — unlike plain readline, which can only splice a
+# mode indicator before the *last line* of PS1 — this can sit inline and
+# still update live. See ble.sh's own contrib/prompt-vim-mode.bash, which
+# this mirrors but emits a color instead of "(ins)"/"(cmd)" text.
+function ble/prompt/backslash:v/vi-mode-color {
+    local mode; ble/keymap:vi/script/get-mode
+    case $mode in
+    ([iR]*) ble/prompt/print $'\033[1;32m' ;;
+    (*)      ble/prompt/print $'\033[1;31m' ;;
+    esac
+}
+
+# Plain-readline fallback PS1 (static insert-mode green) for the rare case
+# ble.sh fails to attach (e.g. no TTY); overwritten below once it does.
+PS1='\[\033[1;37m\][$(_v_git_branch)] \[\033[0;34m\]\w\[\033[0m\] \[\033[1;32m\]\$\[\033[0m\] '
+
+# variables to make RANGER open files with the correct editor
+export VISUAL=nvim
+export EDITOR=nvim
+
+# ---- End from the Backup ----
+
+# Preferred editor for local and remote sessions
+if [[ -n $SSH_CONNECTION ]]; then
+    export EDITOR='vim'
+else
+    export EDITOR='nvim'
+fi
+
+# Add .NET Core SDK tools
+export PATH="$PATH:/home/v/.dotnet/tools"
+
+# >>> juliaup initialize >>>
+# !! Contents within this block are managed by juliaup !!
+export PATH="/home/v/.juliaup/bin:$PATH"
+# <<< juliaup initialize <<<
+
+PATH="/home/v/perl5/bin${PATH:+:${PATH}}"; export PATH;
+PERL5LIB="/home/v/perl5/lib/perl5${PERL5LIB:+:${PERL5LIB}}"; export PERL5LIB;
+PERL_LOCAL_LIB_ROOT="/home/v/perl5${PERL_LOCAL_LIB_ROOT:+:${PERL_LOCAL_LIB_ROOT}}"; export PERL_LOCAL_LIB_ROOT;
+PERL_MB_OPT="--install_base \"/home/v/perl5\""; export PERL_MB_OPT;
+PERL_MM_OPT="INSTALL_BASE=/home/v/perl5"; export PERL_MM_OPT;
+
+# bun (bun's zsh completion at ~/.bun/_bun isn't bash-compatible; run
+# `bun completions` from a bash session to generate/wire the bash one)
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
+
+# Aliases and functions are shell-agnostic, so bash reuses zsh's copy
+# directly instead of maintaining a duplicate that could drift out of sync.
+[[ -r "$HOME/.config/zsh/custom/aliases.zsh" ]] &&
+    source "$HOME/.config/zsh/custom/aliases.zsh"
+
+source "$HOME/.config/bash/custom/quote_highlighting.bash"
+
+# opencode
+export PATH=/home/v/.opencode/bin:$PATH
+
+# Switch to the dynamic vi-mode-colored prompt whenever ble.sh was sourced —
+# set *before* attaching, since ble.sh parses/caches PS1 as of attach time
+# and won't notice a later reassignment (see the
+# `ble/prompt/backslash:v/vi-mode-color` function above).
+if [[ ${BLE_VERSION-} ]]; then
+    PS1='\[\033[1;37m\][$(_v_git_branch)] \[\033[0;34m\]\w\[\033[0m\] \q{v/vi-mode-color}\$\[\033[0m\] '
+    ble-attach
+fi
