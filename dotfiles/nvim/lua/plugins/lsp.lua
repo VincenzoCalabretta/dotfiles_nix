@@ -30,8 +30,11 @@ return {
             vim.keymap.set('n', keys, func, { buffer = event.buf, desc = 'LSP: ' .. desc })
           end
 
-          map('gd', require('telescope.builtin').lsp_definitions, '[G]oto [D]efinition')
-          map('gr', require('telescope.builtin').lsp_references, '[G]oto [R]eferences')
+          -- gd/gr are intentionally NOT bound here (buffer-local maps would
+          -- shadow the global ones). They're set once, globally, in
+          -- lua/lsp_fallback.lua, which tries LSP first and falls through
+          -- to a gtags query when the client has no results (or no client
+          -- is attached at all) -- see that file for why.
           map('gI', require('telescope.builtin').lsp_implementations, '[G]oto [I]mplementation')
           map('<leader>D', require('telescope.builtin').lsp_type_definitions, 'Type [D]efinition')
           map('<leader>ds', require('telescope.builtin').lsp_document_symbols, '[D]ocument [S]ymbols')

@@ -17,6 +17,8 @@ vim.lsp.log.set_level("warn")
 require("lazy.lazy")
 
 require("numconv").setup()
+require("gtags_db").setup()
+require("lsp_fallback").setup()
 
 
 -- TODO:

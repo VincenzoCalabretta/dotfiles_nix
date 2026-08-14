@@ -45,7 +45,7 @@ alias pmake='time nice make -j$NUMCPUS --load-average=$NUMCPUS'
 
 alias docs='cd $HOME/docs/'
 
-hm() { home-manager switch --flake "$HOME/dotfiles-nix#v"; }
+hm() { home-manager switch --flake "$HOME/dotfiles_nix_personal#v"; }
 
 # Build llvm-project and keep the root compile_commands.json (used by clangd)
 # in sync, merging in build/runtimes/runtimes-bins/compile_commands.json when
