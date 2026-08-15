@@ -51,9 +51,10 @@ overlay repo that imports it via `inputs.dotfiles`. Concretely:
 
 - `home.nix` (this repo) has no `home.username`/`home.homeDirectory` and no
   personal packages; it's exported as `homeManagerModules.base`.
-- `modules/opencode.nix`, `modules/claude.nix`, and `modules/llama-relay.nix`
-  — all coupled to the private `llama-server`/`opencode-mcp-tools` flake
-  inputs and a personal Forgejo — live in the overlay repo, not here.
+- `modules/opencode.nix`, `modules/claude.nix`, `modules/pi.nix`, and
+  `modules/llama-relay.nix` — all coupled to the private
+  `llama-server`/`opencode-mcp-tools` flake inputs and a personal Forgejo —
+  live in the overlay repo, not here.
 - `modules/hardware.nix` (this laptop's own audio/USB-device quirks) also
   lives in the overlay, colocated with the one host it applies to — it was
   never a reusable module, just factored into its own file.
