@@ -81,14 +81,10 @@ return {
       
     require('bazel_picker').setup({
       keymaps = {
-        pick = "<leader>bs",
         build = "<leader>bb",  -- Pick target → Pick config → Build
         test = "<leader>bt",   -- Pick target → Pick config → Test
         run = "<leader>br",    -- Pick target → Pick config → Run
         debug = "<leader>bd",  -- Pick target → Pick config → Debug (with DAP)
-        build_config = "<leader>bC",
-        test_config = "<leader>bTC",
-        run_config = "<leader>bRC",
       }
     })
     end,

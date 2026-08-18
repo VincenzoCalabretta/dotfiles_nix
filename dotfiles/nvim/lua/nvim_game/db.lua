@@ -1,4 +1,4 @@
--- Complete keybinding database for nvim_game.
+-- User-facing global and LSP/Gitsigns/Aerial buffer-local keybinding database for nvim_game.
 -- Each entry: { key, desc, category, hint (optional) }
 -- 'key' uses the exact notation the user would type/see in config.
 
@@ -42,12 +42,13 @@ return {
   { key = '<leader>tD',   desc = 'Toggle display of deleted git lines',             category = 'Git' },
 
   -- ── Git — diffview / git_branch_inspect ────────────────────────────────────
-  { key = '<leader>gv',   desc = 'Open diffview full diff panel',                   category = 'Git' },
-  { key = '<leader>gc',   desc = 'Close diffview panel',                            category = 'Git' },
+  { key = '<leader>gC',   desc = 'Close diffview panel',                            category = 'Git' },
   { key = '<leader>gh',   desc = 'Open diffview file history for current file',     category = 'Git' },
   { key = '<leader>gH',   desc = 'Open diffview repo-wide file history',            category = 'Git' },
   { key = '<leader>gb',   desc = 'Browse files from a specific git branch',         category = 'Git' },
   { key = '<leader>gd',   desc = 'Quick diff current file against a branch',        category = 'Git' },
+  { key = '<leader>gg',   desc = 'Open Neogit status',                               category = 'Git' },
+  { key = '<leader>gD',   desc = 'Open full Diffview panel',                         category = 'Git' },
 
   -- ── Telescope ──────────────────────────────────────────────────────────────
   { key = '<leader>sf',   desc = 'Find files in project root',                      category = 'Telescope' },
@@ -62,6 +63,7 @@ return {
   { key = '<leader>/',    desc = 'Fuzzy search inside current buffer',              category = 'Telescope' },
   { key = '<leader>s/',   desc = 'Live grep in open files only',                    category = 'Telescope' },
   { key = '<leader>sn',   desc = 'Find files inside Neovim config directory',       category = 'Telescope' },
+  { key = '<leader>ep',   desc = 'Browse installed lazy.nvim plugins',               category = 'Telescope' },
 
   -- ── Harpoon ────────────────────────────────────────────────────────────────
   { key = '<leader>ha',   desc = 'Pin current file to Harpoon list',               category = 'Harpoon' },
@@ -77,9 +79,20 @@ return {
   { key = '<leader>a',    desc = 'Toggle aerial code outline panel',               category = 'Navigation' },
   { key = '<leader>ao',   desc = 'Open aerial outline',                            category = 'Navigation' },
   { key = '<leader>ac',   desc = 'Close aerial outline',                           category = 'Navigation' },
+  { key = '<leader>aO',   desc = 'Open all nodes in aerial outline',                category = 'Navigation' },
+  { key = '<leader>aC',   desc = 'Close all nodes in aerial outline',               category = 'Navigation' },
   { key = '<leader>an',   desc = 'Jump to next symbol in aerial',                  category = 'Navigation' },
   { key = '<leader>ap',   desc = 'Jump to previous symbol in aerial',              category = 'Navigation' },
+  { key = '<leader>ag',   desc = 'Jump to a symbol in aerial outline',             category = 'Navigation' },
   { key = '<leader>aN',   desc = 'Toggle aerial navigation floating window',       category = 'Navigation' },
+  { key = '<leader>ai',   desc = 'Show aerial information',                         category = 'Navigation' },
+  { key = '<leader>as',   desc = 'Search aerial symbols with Telescope',            category = 'Navigation' },
+  { key = '<leader>af',   desc = 'Search aerial symbols with FZF-Lua',              category = 'Navigation' },
+  { key = '<leader>aS',   desc = 'Search aerial symbols with Snacks',               category = 'Navigation' },
+  { key = '{',            desc = 'Jump to previous Aerial symbol',                 category = 'Navigation' },
+  { key = '}',            desc = 'Jump to next Aerial symbol',                     category = 'Navigation' },
+  { key = '[[',           desc = 'Jump to previous enclosing Aerial symbol',       category = 'Navigation' },
+  { key = ']]',           desc = 'Jump to next enclosing Aerial symbol',           category = 'Navigation' },
 
   -- ── Treesitter motions ────────────────────────────────────────────────────
   { key = ']m',           desc = 'Jump to start of next function',                 category = 'Navigation' },
@@ -91,6 +104,9 @@ return {
   -- ── Flash ─────────────────────────────────────────────────────────────────
   { key = 's',            desc = 'Flash: type 2 chars then pick a jump label',    category = 'Navigation' },
   { key = 'S',            desc = 'Flash treesitter: select any visible TS node',  category = 'Navigation' },
+  { key = 'r',            desc = 'Flash remote motion (operator-pending mode)',   category = 'Navigation' },
+  { key = 'R',            desc = 'Flash Treesitter search (operator/visual mode)', category = 'Navigation' },
+  { key = '<c-s>',        desc = 'Toggle Flash search (command-line mode)',        category = 'Navigation' },
 
   -- ── Textobjects (mini.ai + treesitter) ────────────────────────────────────
   { key = 'aF',           desc = 'Textobject: AROUND function declaration',        category = 'Textobjects',
@@ -107,27 +123,47 @@ return {
     hint = 'mini.ai: just the argument list, not the parens' },
 
   -- ── DAP (debugging) ───────────────────────────────────────────────────────
-  { key = '<leader>dc',   desc = 'Continue / start debug session',                 category = 'DAP' },
-  { key = '<leader>dn',   desc = 'Step over (next line, skip into calls)',         category = 'DAP' },
-  { key = '<leader>di',   desc = 'Step into the current function call',            category = 'DAP' },
-  { key = '<leader>do',   desc = 'Step out of the current function',               category = 'DAP' },
-  { key = '<leader>db',   desc = 'Toggle breakpoint on current line',              category = 'DAP' },
-  { key = '<leader>dB',   desc = 'Set a conditional breakpoint (prompts)',         category = 'DAP' },
-  { key = '<leader>dT',   desc = 'Terminate the active debug session',             category = 'DAP' },
-  { key = '<leader>dr',   desc = 'Toggle the DAP REPL',                            category = 'DAP' },
-  { key = '<leader>dv',   desc = 'Open DAP variable / stack view panel',           category = 'DAP' },
-  { key = '<leader>da',   desc = 'Watch variable under cursor in REPL',            category = 'DAP' },
-  { key = '<leader>dl',   desc = 'Re-launch the most recent debug target',         category = 'DAP' },
-  { key = '<leader>dt',   desc = 'Debug C++ Bazel test — pick with Telescope',    category = 'DAP' },
-  { key = '<leader>du',   desc = 'Debug Rust Bazel target — pick with Telescope', category = 'DAP' },
-  { key = '<leader>dp',   desc = 'Debug Python Bazel target — pick with Telescope', category = 'DAP' },
+  { key = '<M-c>',        desc = 'Continue or start a debug session',              category = 'DAP' },
+  { key = '<M-a>',        desc = 'Continue all active debug sessions',             category = 'DAP' },
+  { key = '<M-t>',        desc = 'Terminate the active debug session',             category = 'DAP' },
+  { key = '<M-b>',        desc = 'Toggle a breakpoint on the current line',        category = 'DAP' },
+  { key = '<M-B>',        desc = 'Set a conditional breakpoint',                   category = 'DAP' },
+  { key = '<M-n>',        desc = 'Step over the current line',                     category = 'DAP' },
+  { key = '<M-s>',        desc = 'Step into the current function call',            category = 'DAP' },
+  { key = '<M-o>',        desc = 'Step out of the current function',               category = 'DAP' },
+  { key = '<M-r>',        desc = 'Toggle the DAP REPL',                             category = 'DAP' },
+  { key = '<M-p>',        desc = 'Pause the active debug session',                 category = 'DAP' },
+  { key = '<M-f>',        desc = 'Jump to the current DAP stack frame',            category = 'DAP' },
+  { key = '<M-g>',        desc = 'Select an active DAP session',                   category = 'DAP' },
+  { key = '<M-w>',        desc = 'Add the expression under cursor as a watch',     category = 'DAP' },
+  { key = '<leader>gtt',  desc = 'Set tracepoint at word under cursor',            category = 'DAP' },
+  { key = '<leader>gtT',  desc = 'Set tracepoint at a prompted location',          category = 'DAP' },
+  { key = '<leader>gts',  desc = 'Start tracepoint collection',                    category = 'DAP' },
+  { key = '<leader>gtv',  desc = 'Stop collection and show trace timeline',        category = 'DAP' },
+  { key = '<leader>gtc',  desc = 'Clear all tracepoints',                           category = 'DAP' },
+  { key = '<leader>gti',  desc = 'Show tracepoint information in the REPL',        category = 'DAP' },
+  { key = '<leader>gv',   desc = 'Open the DAP variable and stack view',           category = 'DAP' },
+  { key = '<leader>gV',   desc = 'Close the DAP variable and stack view',          category = 'DAP' },
+  { key = '<leader>gs',   desc = 'Connect DAP to SIL flight software and simulator', category = 'DAP' },
+  { key = '<leader>gc',   desc = 'Debug a C++ Bazel target',                        category = 'DAP' },
+  { key = '<leader>gl',   desc = 'Relaunch the most recent DAP target',            category = 'DAP' },
+  { key = '<leader>gp',   desc = 'Debug a Python Bazel target',                    category = 'DAP' },
+  { key = '<leader>gP',   desc = 'Debug a Python target from prompted input',      category = 'DAP' },
+  { key = '<leader>gr',   desc = 'Debug a Rust Bazel target',                      category = 'DAP' },
+  { key = '<leader>gR',   desc = 'Debug a Rust target from prompted input',        category = 'DAP' },
+  { key = '<leader>dfc',  desc = 'Open Telescope DAP commands picker',             category = 'DAP' },
+  { key = '<leader>dfb',  desc = 'Open Telescope DAP breakpoints picker',          category = 'DAP' },
+  { key = '<leader>dfv',  desc = 'Open Telescope DAP variables picker',            category = 'DAP' },
+  { key = '<leader>dff',  desc = 'Open Telescope DAP stack-frames picker',         category = 'DAP' },
 
   -- ── Bazel ─────────────────────────────────────────────────────────────────
-  { key = '<leader>bs',   desc = 'Pick any Bazel target and action',              category = 'Bazel' },
   { key = '<leader>bb',   desc = 'Pick Bazel target then build it',               category = 'Bazel' },
   { key = '<leader>bt',   desc = 'Pick Bazel target then run tests',              category = 'Bazel' },
   { key = '<leader>br',   desc = 'Pick Bazel target then run it',                 category = 'Bazel' },
   { key = '<leader>bd',   desc = 'Pick Bazel target then debug it',               category = 'Bazel' },
+  { key = '<leader>ba',   desc = 'Toggle automatic Bazel rebuilds',                category = 'Bazel' },
+  { key = '<leader>bh',   desc = 'Show recently used Bazel targets',               category = 'Bazel' },
+  { key = '<leader>bc',   desc = 'Clear recently used Bazel targets',              category = 'Bazel' },
 
   -- ── Overseer (task runner) ─────────────────────────────────────────────────
   { key = '<leader>o',    desc = 'Toggle Overseer task panel',                     category = 'Tasks' },
@@ -138,7 +174,19 @@ return {
   { key = '<leader>Sl',   desc = 'Restore the most recently used session',         category = 'Sessions' },
   { key = '<leader>Sd',   desc = 'Stop auto-saving session (for a clean exit)',    category = 'Sessions' },
 
+  -- ── Sidekick / profiling ──────────────────────────────────────────────────
+  { key = '<leader>ll',   desc = 'Toggle the Sidekick AI CLI',                      category = 'AI' },
+  { key = '<leader>pp',   desc = 'Toggle the Snacks profiler',                      category = 'Profiling' },
+  { key = '<leader>ph',   desc = 'Toggle Snacks profiler highlights',               category = 'Profiling' },
+  { key = '<leader>ps',   desc = 'Open the Snacks profiler scratch buffer',         category = 'Profiling' },
+
+  -- ── Keybinding game ───────────────────────────────────────────────────────
+  { key = '<leader>G',    desc = 'Open the keybinding game category menu',          category = 'KeyGame' },
+  { key = '<leader>Ga',   desc = 'Start the keybinding game with all categories',   category = 'KeyGame' },
+
   -- ── Windows & splits ──────────────────────────────────────────────────────
+  { key = '<Esc>',        desc = 'Clear search highlighting; exit terminal mode',  category = 'Windows' },
+  { key = '<Esc><Esc>',   desc = 'Exit terminal mode (alternative)',                category = 'Windows' },
   { key = '<C-h>',        desc = 'Move focus to left window',                      category = 'Windows' },
   { key = '<C-l>',        desc = 'Move focus to right window',                     category = 'Windows' },
   { key = '<C-j>',        desc = 'Move focus to lower window',                     category = 'Windows' },
@@ -148,6 +196,7 @@ return {
   -- ── Misc / editing ────────────────────────────────────────────────────────
   { key = '<leader>u',    desc = 'Toggle undo tree panel',                         category = 'Misc' },
   { key = '<leader>v',    desc = 'Toggle Venn diagram drawing mode',               category = 'Misc' },
+  { key = '<leader>cn',   desc = 'Convert the number under cursor or selection',    category = 'Misc' },
   { key = '<leader>x',    desc = 'Execute current line as Lua',                    category = 'Misc' },
   { key = '<leader><leader>x', desc = 'Source / execute the current Lua file',    category = 'Misc' },
 }

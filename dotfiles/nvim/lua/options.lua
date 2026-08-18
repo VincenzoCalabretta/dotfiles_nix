@@ -20,9 +20,8 @@ vim.opt.ignorecase = true
 vim.opt.smartcase = true
 
 vim.opt.updatetime = 100
--- Time to mapped sequence wait time,
--- used for example for whick-key popup
-vim.opt.timeoutlen = 300
+-- Time to wait for the rest of a mapped sequence.
+vim.opt.timeoutlen = 500
 
 --  See `:help 'list'`
 --  and `:help 'listchars'`

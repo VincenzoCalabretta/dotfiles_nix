@@ -222,14 +222,21 @@ local function setup_keys()
   bind('<Space>', LEADER)
 
   -- Control combos used as keybindings
-  for _, c in ipairs({ 'h', 'j', 'k', 'l', 's' }) do
+  for _, c in ipairs({ 'h', 'j', 'k', 'l' }) do
     bind('<C-' .. c .. '>', '<C-' .. c .. '>')
+  end
+  bind('<C-s>', '<c-s>')
+
+  -- Alt combos used by the DAP mappings. Neovim normalizes Alt as <M-...>.
+  for _, c in ipairs({ 'a', 'b', 'B', 'c', 'f', 'g', 'n', 'o', 'p', 'r', 's', 't', 'w' }) do
+    bind('<M-' .. c .. '>', '<M-' .. c .. '>')
   end
 
   -- Game control
   bind('<CR>',  '__submit__')
   bind('<BS>',  '__bs__')
-  bind('<Esc>', '__quit__')
+  bind('<Esc>', '<Esc>')
+  bind('<C-c>', '__quit__')
 
   -- Menu navigation
   bind('j', '__down__')
@@ -627,7 +634,7 @@ function M.handle_key(action)
       end
       render()
     elseif action == '__quit__' then
-      -- Esc from question → skip
+      -- <C-c> from question → skip
       skip()
     elseif action ~= '__down__' and action ~= '__up__' then
       -- Regular character or special token

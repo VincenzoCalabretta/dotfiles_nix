@@ -28,14 +28,14 @@ start()
             ├─ user types answer char by char
             ├─ <Space> inserts "<leader>" token
             ├─ <BS> removes last token (bracket-aware)
-            ├─ <Esc> skips the question (re-queues it)
+            ├─ <C-c> skips the question (re-queues it)
             └─ <Enter> submits
                  ├─ correct → score + streak → FEEDBACK
                  └─ wrong   → re-insert at random later position → FEEDBACK
                       └─ any key → QUESTION (next)
                            └─ queue exhausted → RESULTS
                                 ├─ <Enter> → back to MENU
-                                └─ <Esc>   → close window
+                                └─ <C-c>  → close window
 ```
 
 ### Scoring
@@ -57,13 +57,14 @@ memory yet (see planned features).
 ### Key capture mechanism
 
 The floating window buffer maps every printable key (a-z, A-Z, 0-9,
-punctuation, Ctrl combos) to `M.handle_key(token)` via buffer-local
+punctuation, Ctrl/Alt combos) to `M.handle_key(token)` via buffer-local
 normal-mode keymaps with `nowait = true`. The buffer is `buftype=nofile,
 modifiable=false` so nothing is ever written to it directly.
 
 Special tokens:
 - `<Space>` → appends the literal string `<leader>`
 - `<C-h>` → appends `<C-h>` (the full token, used as a keybinding)
+- `<C-c>` → skips a question or closes the game
 - `<BS>`  → removes the last token; if the input ends with `>`, it strips
             the entire `<...>` bracket group so `<C-h>` is deleted as one unit
 
@@ -81,9 +82,8 @@ Special tokens:
   in most terminals. These bindings cannot currently be practiced because the
   terminal sends the same byte as Tab/Enter.
 
-- **Modifier keys beyond Ctrl**: `<M-x>`, `<A-x>` (Alt) are not in the
-  keymap table yet. None of this config's current bindings use Alt, but future
-  ones might.
+- **Modifier keys beyond Ctrl and Alt**: `<D-x>` / Super bindings are not in
+  the keymap table. The current configuration does not use them.
 
 - **Multi-key non-leader prefixes**: `gq`, `gr`, `gd`, `gI`, `gD` start with
   `g`. Pressing `g` appends `g`, then `q` appends `q`, giving `gq` correctly.
@@ -112,10 +112,9 @@ Special tokens:
 
 ### Database
 
-- **`<leader>as` conflict**: `ankivim.lua` and `aerial.lua` both claim
-  `<leader>as`. Aerial's key is documented in the db (search symbols).
-  The actual winner at runtime depends on load order. This is a pre-existing
-  config conflict that should be resolved by remapping one of them.
+- The database covers user-facing global mappings and LSP/Gitsigns/Aerial
+  buffer-local mappings. It intentionally excludes plugin-internal window
+  controls (for example, Aerial's outline-window controls).
 
 - **Textobject entries (`aF`, `iF`, etc.)** are not really "press this key"
   bindings — they are operator suffixes. Practicing them as standalone answers

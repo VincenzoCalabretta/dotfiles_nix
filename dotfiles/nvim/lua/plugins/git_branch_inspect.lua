@@ -58,7 +58,7 @@ return {
       { '<leader>gb', desc = '[G]it [B]rowse files from branch' },
       { '<leader>gd', desc = '[G]it [D]iff current file with branch' },
       { '<leader>gg', '<cmd>Neogit<cr>', desc = '[G]it Neo[g]it' },
-      { '<leader>gc', '<cmd>DiffviewClose<cr>', desc = '[G]it diffview [C]lose' },
+      { '<leader>gC', '<cmd>DiffviewClose<cr>', desc = '[G]it diffview [C]lose' },
       { '<leader>gh', '<cmd>DiffviewFileHistory %<cr>', desc = '[G]it file [H]istory' },
       { '<leader>gH', '<cmd>DiffviewFileHistory<cr>', desc = '[G]it repo [H]istory' },
     },

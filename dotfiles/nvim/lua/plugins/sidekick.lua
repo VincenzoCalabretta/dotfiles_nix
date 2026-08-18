@@ -9,7 +9,7 @@ return {
 		},
 		keys = {
 			{
-				"<leader>aa",
+				"<leader>ll",
 				function()
 					require("sidekick.cli").toggle()
 				end,

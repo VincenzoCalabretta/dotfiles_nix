@@ -1,4 +1,4 @@
--- git_branch_inspect.lua already owns <leader>gc/gh/gH/gd for diffview.
+-- git_branch_inspect.lua already owns <leader>gC/gh/gH/gd for diffview.
 -- This file only loads the plugin and adds the one missing key: full diff open.
 return {
   {
