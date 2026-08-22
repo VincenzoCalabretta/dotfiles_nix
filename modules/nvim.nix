@@ -53,5 +53,9 @@ in
     home.sessionVariables = lib.mkIf cfg.enable {
       COMPILER_EXPLORER_URL = cfg.url;
     };
+
+    xdg.configFile."compiler-explorer-nvim/url" = lib.mkIf cfg.enable {
+      text = cfg.url;
+    };
   };
 }

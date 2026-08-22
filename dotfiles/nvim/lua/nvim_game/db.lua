@@ -233,7 +233,11 @@ local mappings = {
 	{ key = "<leader><leader>x", desc = "Source / execute the current Lua file", category = "Misc" },
 }
 
-if vim.env.COMPILER_EXPLORER_URL then
+local config_home = vim.env.XDG_CONFIG_HOME or (vim.env.HOME .. "/.config")
+local compiler_explorer_enabled = vim.env.COMPILER_EXPLORER_URL
+	or vim.fn.filereadable(config_home .. "/compiler-explorer-nvim/url") == 1
+
+if compiler_explorer_enabled then
 	table.insert(mappings, {
 		key = "<leader>ce",
 		desc = "Compile the current buffer or selection in Compiler Explorer",
