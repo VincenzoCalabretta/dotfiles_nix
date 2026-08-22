@@ -124,6 +124,20 @@
           inherit pkgs;
           compiler-explorer-module = ./modules/compiler-explorer.nix;
         };
+        compiler-explorer-home-manager-vm = import ./tests/compiler-explorer-home-manager-vm.nix {
+          inherit pkgs home-manager;
+          nvim-module = ./modules/nvim.nix;
+        };
+        compiler-explorer-project = pkgs.runCommand "compiler-explorer-project-test" {
+          nativeBuildInputs = [ pkgs.neovim ];
+        } ''
+          export HOME="$TMPDIR"
+          nvim --headless --clean -u NONE \
+            '+set runtimepath+=${./dotfiles/nvim}' \
+            '+luafile ${./tests/compiler-explorer-project.lua}' \
+            +qa
+          touch "$out"
+        '';
       };
     };
 }

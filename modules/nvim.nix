@@ -2,15 +2,28 @@
 
 let
   cfg = config.dotfiles.nvim.compilerExplorer;
+  compiler-explorer = pkgs.callPackage ../packages/compiler-explorer.nix { };
 in
 {
   options.dotfiles.nvim.compilerExplorer = {
-    enable = lib.mkEnableOption "the Compiler Explorer Neovim client";
+    enable = lib.mkEnableOption "the Compiler Explorer Neovim client and local user service";
 
     url = lib.mkOption {
       type = lib.types.str;
-      default = "http://127.0.0.1:10240";
+      default = "http://127.0.0.1:${toString cfg.port}";
       description = "Compiler Explorer API base URL used by compiler-explorer.nvim.";
+    };
+
+    port = lib.mkOption {
+      type = lib.types.port;
+      default = 10240;
+      description = "Loopback port exposed by the Compiler Explorer user socket.";
+    };
+
+    idleTimeoutSec = lib.mkOption {
+      type = lib.types.ints.positive;
+      default = 300;
+      description = "Seconds without an HTTP request before the user service exits.";
     };
   };
 
@@ -63,6 +76,46 @@ in
     # lockfile deployed with the Neovim configuration.
     xdg.configFile."compiler-explorer-nvim/plugin-path" = lib.mkIf cfg.enable {
       text = toString pkgs.vimPlugins.compiler-explorer-nvim;
+    };
+
+    systemd.user.sockets.compiler-explorer = lib.mkIf cfg.enable {
+      Unit.Description = "Compiler Explorer activation socket";
+      Socket = {
+        ListenStream = "127.0.0.1:${toString cfg.port}";
+        NoDelay = true;
+      };
+      Install.WantedBy = [ "sockets.target" ];
+    };
+
+    # This intentionally runs as the Home Manager user. Project-aware
+    # compilation needs read access to compile_commands.json include paths,
+    # including CMake trees and Bazel execroots under the user's home.
+    systemd.user.services.compiler-explorer = lib.mkIf cfg.enable {
+      Unit = {
+        Description = "Self-hosted Compiler Explorer";
+        Requires = [ "compiler-explorer.socket" ];
+        After = [ "compiler-explorer.socket" ];
+      };
+      Service = {
+        ExecStart = lib.getExe compiler-explorer;
+        Environment = [
+          "HOME=${config.home.homeDirectory}"
+          "IDLE_TIMEOUT=${toString cfg.idleTimeoutSec}"
+        ];
+        Restart = "on-failure";
+        PrivateTmp = true;
+        PrivateDevices = true;
+        ProtectSystem = "strict";
+        ProtectKernelTunables = true;
+        ProtectKernelModules = true;
+        ProtectControlGroups = true;
+        RestrictSUIDSGID = true;
+        LockPersonality = true;
+        NoNewPrivileges = true;
+        UMask = "0077";
+        CapabilityBoundingSet = "";
+        SystemCallArchitectures = "native";
+      };
     };
   };
 }

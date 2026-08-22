@@ -20,6 +20,7 @@ return {
 		end,
 		cmd = {
 			"CECompile",
+			"CECompileProject",
 			"CECompileLive",
 			"CEFormat",
 			"CEAddLibrary",
@@ -30,13 +31,13 @@ return {
 		keys = {
 			{
 				"<leader>ce",
-				"<cmd>CECompile<cr>",
+				"<cmd>CECompileProject<cr>",
 				mode = "n",
 				desc = "Compiler Explorer: compile buffer",
 			},
 			{
 				"<leader>ce",
-				":<C-u>'<,'>CECompile<cr>",
+				":<C-u>'<,'>CECompileProject<cr>",
 				mode = "x",
 				desc = "Compiler Explorer: compile selection",
 			},
@@ -51,6 +52,14 @@ return {
 				},
 				open_qflist = true,
 				split = "vsplit",
+			})
+
+			vim.api.nvim_create_user_command("CECompileProject", function(opts)
+				require("compiler_explorer_project").compile(opts)
+			end, {
+				range = "%",
+				bang = true,
+				nargs = "*",
 			})
 		end,
 	},

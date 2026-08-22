@@ -142,23 +142,48 @@ Notable local code includes:
 Enable the client in a Home Manager profile with
 `dotfiles.nvim.compilerExplorer.enable = true`. It defaults to
 `http://127.0.0.1:10240`; override `dotfiles.nvim.compilerExplorer.url` for a
-different self-hosted endpoint. The matching opt-in NixOS service is exported
-as `nixosModules.compiler-explorer` and enabled with
-`dotfiles.compiler-explorer.enable = true`. It is socket-activated, binds only
-to loopback, and exposes the flake-pinned GCC, Clang, and Rust toolchains.
+different endpoint. The same option deploys a Home Manager systemd user
+service. It is socket-activated, binds only to loopback, and exposes the
+flake-pinned GCC, Clang, and Rust toolchains. Because it runs as the Home
+Manager user, local compilation can resolve project headers referenced by a
+compilation database. Override `dotfiles.nvim.compilerExplorer.port` or
+`.idleTimeoutSec` when needed.
 
-After rebuilding NixOS and activating the Home Manager generation, open a C,
-C++, or Rust buffer in Neovim and press `<leader>ce`. The first invocation asks
-which local compiler to use and which flags to pass, then opens the generated
-assembly in a vertical split. Select a range in visual mode and press the same
-mapping to compile only that selection. The service starts automatically on
-the first request and exits after five minutes without a request, so an
-inactive `compiler-explorer.service` while `compiler-explorer.socket` remains
-active is normal.
+After activating the Home Manager generation, open a C or C++ translation unit
+in Neovim and press `<leader>ce`. Neovim finds the nearest
+`compile_commands.json`, selects the entry for the current file, resolves its
+relative paths, removes output/dependency flags, and sends the remaining flags
+to the matching local GCC or Clang backend. The generated assembly opens in a
+vertical split. Select a range in visual mode and press the same mapping to
+compile only that selection.
+
+The database may contain either `arguments` arrays or shell-quoted `command`
+strings. Response files are expanded, which covers Bazel databases that put
+their arguments in `@...` parameter files. Project include paths, defines,
+language standards, target flags, forced includes, and sysroots are preserved.
+The source directory is added as an `-iquote` path so neighboring quoted
+headers still resolve after Compiler Explorer copies the source into its
+temporary directory. For C and C++, a missing, malformed, stale, or unmatched
+database is reported as an error instead of silently compiling with incomplete
+flags. Run `:CECompile` to deliberately enter flags manually. Rust buffers keep
+the plugin's interactive compiler/flags prompts because Cargo does not produce
+`compile_commands.json`.
+
+The search checks each parent for the database directly and under common CMake
+build directories (`build`, `build/debug`, `build/release`,
+`cmake-build-debug`, `cmake-build-release`, and `out`). For another layout, set
+`vim.g.compiler_explorer_compile_commands` globally or
+`vim.b.compiler_explorer_compile_commands` for one buffer to an explicit path.
+
+The service starts automatically on the first request and exits after five
+minutes without a request, so an inactive `compiler-explorer.service` while
+`compiler-explorer.socket` remains active is normal.
 
 The most useful commands are:
 
-- `:CECompile` — compile the current buffer or visual selection;
+- `:CECompileProject` — compile using the current file's compilation database
+  entry, reporting an error when it cannot be used;
+- `:CECompile` — bypass the database and select flags interactively;
 - `:CECompileLive` — compile now and recompile after each save;
 - `:CECompile compiler=nix-gcc-cpp flags=-O2\ -Wall` — select a compiler and
   flags without prompts (`nix-gcc-c`, `nix-clang-c`, `nix-gcc-cpp`,
@@ -181,9 +206,9 @@ syntax.
 To verify or troubleshoot the local service outside Neovim:
 
 ```console
-systemctl status compiler-explorer.socket
+systemctl --user status compiler-explorer.socket
 curl -fsS http://127.0.0.1:10240/api/languages
-journalctl --unit compiler-explorer.service --since today
+journalctl --user --unit compiler-explorer.service --since today
 ```
 
 Compilation is deliberately non-executable: the service returns assembly and
