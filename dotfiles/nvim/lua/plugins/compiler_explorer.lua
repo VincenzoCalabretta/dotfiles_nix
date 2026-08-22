@@ -1,18 +1,20 @@
-local function compiler_explorer_url()
-	if vim.env.COMPILER_EXPLORER_URL then
-		return vim.env.COMPILER_EXPLORER_URL
-	end
-
+local function read_config(name)
 	local config_home = vim.env.XDG_CONFIG_HOME or (vim.env.HOME .. "/.config")
-	local path = config_home .. "/compiler-explorer-nvim/url"
+	local path = config_home .. "/compiler-explorer-nvim/" .. name
 	if vim.fn.filereadable(path) == 1 then
 		return vim.trim(vim.fn.readfile(path)[1] or "")
 	end
 end
 
+local function compiler_explorer_url()
+	return vim.env.COMPILER_EXPLORER_URL or read_config("url")
+end
+
 return {
 	{
 		"krady21/compiler-explorer.nvim",
+		dir = read_config("plugin-path"),
+		name = "compiler-explorer.nvim",
 		cond = function()
 			return compiler_explorer_url() ~= nil
 		end,
