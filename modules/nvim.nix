@@ -57,5 +57,12 @@ in
     xdg.configFile."compiler-explorer-nvim/url" = lib.mkIf cfg.enable {
       text = cfg.url;
     };
+
+    # Seed Lazy's install path from the pinned nixpkgs plugin. This avoids a
+    # first-run network clone and keeps Lazy from trying to rewrite the
+    # read-only lockfile deployed with the Neovim configuration.
+    xdg.dataFile."nvim/lazy/compiler-explorer.nvim" = lib.mkIf cfg.enable {
+      source = pkgs.vimPlugins.compiler-explorer-nvim;
+    };
   };
 }
