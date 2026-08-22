@@ -146,6 +146,27 @@ for _, register in ipairs({ "a", "x", "y", "s", "pc", "p", "d", "dbr", "pbr", "e
 end
 assert(help.register_info("llvm", "%result"))
 
+local architecture, reason = help.infer_architecture({
+	"/* Cortex-M7 reset stub */",
+	"    .syntax unified",
+	"    .thumb",
+	"    ldr r0, =_stack_top",
+})
+assert(architecture == "arm32", architecture)
+assert(reason == "a Cortex-M processor reference on line 1", reason)
+
+architecture, reason = help.infer_architecture({ "    .intel_syntax noprefix", "    mov rax, rbx" })
+assert(architecture == "amd64", architecture)
+assert(reason:find("`.intel_syntax`", 1, true), reason)
+
+architecture, reason = help.infer_architecture({ "    adrp x0, symbol", "    add x0, x0, :lo12:symbol" })
+assert(architecture == "aarch64", architecture)
+assert(reason == "AArch64 X-register operands on line 1", reason)
+
+architecture, reason = help.infer_architecture({ '    .attribute arch, "rv64imac"' })
+assert(architecture == "riscv64", architecture)
+assert(reason:find("`rv64`", 1, true), reason)
+
 local buffer = vim.api.nvim_create_buf(false, true)
 vim.api.nvim_buf_set_name(buffer, "compiler-explorer://test-1")
 help.setup()
@@ -163,9 +184,29 @@ vim.api.nvim_set_option_value("filetype", "asm", { buf = ordinary_buffer })
 local ordinary_mapping = vim.api.nvim_buf_call(ordinary_buffer, function()
 	return vim.fn.maparg("K", "n", false, true)
 end)
-assert(ordinary_mapping.buffer ~= 1)
-assert(not vim.api.nvim_buf_get_commands(ordinary_buffer, {}).CEAssemblyHelp)
+assert(ordinary_mapping.buffer == 1)
+assert(ordinary_mapping.desc == "Compiler Explorer: assembly instruction/register help")
+local ordinary_commands = vim.api.nvim_buf_get_commands(ordinary_buffer, {})
+assert(ordinary_commands.CEAssemblyHelp)
+assert(ordinary_commands.CEAssemblyArchitecture)
 
+vim.api.nvim_buf_set_lines(ordinary_buffer, 0, -1, false, { ".syntax unified", ".thumb", "ldr r0, =_stack_top" })
+architecture, reason = help._resolve_architecture(ordinary_buffer)
+assert(architecture == "arm32", architecture)
+assert(reason == "the ARM/Thumb `.thumb` directive on line 2", reason)
+
+local notices = {}
+local original_notify = vim.notify
+vim.notify = function(message)
+	table.insert(notices, message)
+end
+help._notify_inferred_architecture(ordinary_buffer, architecture, reason)
+vim.notify = original_notify
+assert(
+	notices[1]
+		== "Compiler Explorer: inferred assembly architecture `arm32` because the buffer contains the ARM/Thumb `.thumb` directive on line 2",
+	notices[1]
+)
 local test_url = vim.env.COMPILER_EXPLORER_TEST_URL
 if test_url and test_url ~= "" then
 	require("compiler-explorer").setup({ url = test_url })
@@ -190,6 +231,29 @@ if test_url and test_url ~= "" then
 		preview or "assembly help preview did not open"
 	)
 	assert(preview:find("Copies the second operand", 1, true), preview)
+
+	for _, window in ipairs(vim.api.nvim_list_wins()) do
+		if vim.api.nvim_win_get_config(window).relative ~= "" then
+			vim.api.nvim_win_close(window, true)
+		end
+	end
+	vim.api.nvim_set_current_buf(ordinary_buffer)
+	vim.api.nvim_win_set_cursor(0, { 3, 0 })
+	ordinary_mapping.callback()
+	preview = nil
+	assert(
+		vim.wait(10000, function()
+			for _, window in ipairs(vim.api.nvim_list_wins()) do
+				if vim.api.nvim_win_get_config(window).relative ~= "" then
+					preview =
+						table.concat(vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(window), 0, -1, false), "\n")
+					return preview:find("LDR", 1, true) ~= nil
+				end
+			end
+			return false
+		end, 25),
+		preview or "ordinary ARM assembly help preview did not open"
+	)
 end
 
 print("compiler_explorer_asm_help: ok")

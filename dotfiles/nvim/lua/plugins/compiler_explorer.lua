@@ -18,6 +18,7 @@ return {
 		cond = function()
 			return compiler_explorer_url() ~= nil
 		end,
+		ft = "asm",
 		cmd = {
 			"CECompile",
 			"CECompileProject",

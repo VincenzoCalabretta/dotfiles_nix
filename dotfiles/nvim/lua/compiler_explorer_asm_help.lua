@@ -555,6 +555,121 @@ local function normalize_architecture(architecture)
 	return architecture_aliases[architecture] or architecture
 end
 
+local supported_architectures = {
+	["6502"] = true,
+	["65c816"] = true,
+	aarch64 = true,
+	amd64 = true,
+	arm32 = true,
+	avr = true,
+	llvm = true,
+	power = true,
+	ptx = true,
+	riscv64 = true,
+	sass = true,
+}
+
+local architecture_rules = {
+	{ architecture = "ptx", pattern = "^%s*%.version%s+[%d.]", evidence = "a PTX `.version` directive" },
+	{ architecture = "ptx", pattern = "^%s*%.target%s+sm_", evidence = "a PTX `.target sm_...` directive" },
+	{ architecture = "sass", pattern = "^%s*code%s+for%s+sm_", evidence = "an NVIDIA SASS code header" },
+	{ architecture = "arm32", pattern = "^%s*%.thumb%s*$", evidence = "the ARM/Thumb `.thumb` directive" },
+	{ architecture = "arm32", pattern = "^%s*%.thumb_func", evidence = "the ARM/Thumb `.thumb_func` directive" },
+	{ architecture = "arm32", pattern = "cortex%-m%d", evidence = "a Cortex-M processor reference" },
+	{ architecture = "aarch64", pattern = "^%s*%.arch%s+armv8", evidence = "an ARMv8 `.arch` directive" },
+	{ architecture = "aarch64", pattern = "^%s*%.arch%s+armv9", evidence = "an ARMv9 `.arch` directive" },
+	{ architecture = "riscv64", pattern = "^%s*%.option%s+rvc", evidence = "the RISC-V `.option rvc` directive" },
+	{
+		architecture = "riscv64",
+		pattern = '^%s*%.attribute%s+arch%s*,%s*["]rv64',
+		evidence = "an `rv64` architecture attribute",
+	},
+	{ architecture = "amd64", pattern = "^%s*%.intel_syntax", evidence = "the x86 `.intel_syntax` directive" },
+	{ architecture = "amd64", pattern = "^%s*%.att_syntax", evidence = "the x86 `.att_syntax` directive" },
+	{ architecture = "amd64", pattern = "^%s*%.code64", evidence = "the x86-64 `.code64` directive" },
+	{ architecture = "power", pattern = "^%s*%.machine%s+power", evidence = "a Power ISA `.machine` directive" },
+	{ architecture = "power", pattern = "^%s*%.abiversion%s+", evidence = "the Power ELF `.abiversion` directive" },
+	{ architecture = "avr", pattern = "^%s*%.arch%s+avr", evidence = "an AVR `.arch` directive" },
+	{ architecture = "65c816", pattern = '^%s*%.setcpu%s+["]65c816', evidence = "a `.setcpu 65c816` directive" },
+	{ architecture = "6502", pattern = '^%s*%.setcpu%s+["]6502', evidence = "a `.setcpu 6502` directive" },
+}
+
+function M.infer_architecture(lines)
+	for line_number, line in ipairs(lines or {}) do
+		local normalized = line:lower()
+		for _, rule in ipairs(architecture_rules) do
+			if normalized:match(rule.pattern) then
+				return rule.architecture, rule.evidence .. " on line " .. line_number
+			end
+		end
+	end
+
+	for line_number, line in ipairs(lines or {}) do
+		local normalized = line:lower()
+		if normalized:match("%%[rcd]ta?id%.[xyz]") or normalized:match("%%tid%.[xyz]") then
+			return "ptx", "PTX built-in registers on line " .. line_number
+		end
+		if normalized:match("%%r[abcd]x%f[^%w]") then
+			return "amd64", "x86-64 percent-prefixed registers on line " .. line_number
+		end
+		for number in normalized:gmatch("%f[%w]x(%d+)%f[^%w]") do
+			if tonumber(number) <= 30 then
+				return "aarch64", "AArch64 X-register operands on line " .. line_number
+			end
+		end
+	end
+end
+
+local function configured_architecture(buffer)
+	local configured = vim.b[buffer].compiler_explorer_asm_arch
+	if configured == vim.NIL or configured == "" then
+		configured = nil
+	end
+	if configured then
+		local architecture = normalize_architecture(configured)
+		if not supported_architectures[architecture] then
+			return nil,
+				"unsupported architecture `" .. tostring(configured) .. "`; use one of: " .. table.concat(
+					vim.tbl_keys(supported_architectures),
+					", "
+				)
+		end
+		return architecture, "vim.b.compiler_explorer_asm_arch", false
+	end
+
+	local metadata = vim.b[buffer].arch
+	if metadata and metadata ~= vim.NIL then
+		return normalize_architecture(metadata), "Compiler Explorer output metadata", false
+	end
+end
+
+local function resolve_architecture(buffer)
+	local architecture, reason, inferred = configured_architecture(buffer)
+	if architecture or reason then
+		return architecture, reason, inferred
+	end
+
+	local changedtick = api.nvim_buf_get_changedtick(buffer)
+	if vim.b[buffer].compiler_explorer_asm_inference_tick == changedtick then
+		local cached = vim.b[buffer].compiler_explorer_asm_inferred_arch
+		if cached and cached ~= vim.NIL then
+			return cached, vim.b[buffer].compiler_explorer_asm_inference_reason, true
+		end
+	end
+
+	local line_count = api.nvim_buf_line_count(buffer)
+	local lines = api.nvim_buf_get_lines(buffer, 0, math.min(line_count, 2000), false)
+	architecture, reason = M.infer_architecture(lines)
+	vim.b[buffer].compiler_explorer_asm_inference_tick = changedtick
+	vim.b[buffer].compiler_explorer_asm_inferred_arch = architecture or vim.NIL
+	vim.b[buffer].compiler_explorer_asm_inference_reason = reason or vim.NIL
+	if architecture then
+		return architecture, reason, true
+	end
+	return nil,
+		"cannot infer the assembly architecture; set it with `:CEAssemblyArchitecture <architecture>` or `vim.b.compiler_explorer_asm_arch`"
+end
+
 local function normalize_token(token)
 	return (token or ""):lower():gsub("^[$%%]", ""):gsub("[,;:]$", "")
 end
@@ -688,11 +803,30 @@ local function open_preview(lines)
 	})
 end
 
-local function show_impl()
-	local architecture = vim.b.arch
-	if not architecture or architecture == vim.NIL then
-		vim.notify("Compiler Explorer: assembly architecture is unavailable", vim.log.levels.ERROR)
+local function notify_inferred_architecture(buffer, architecture, reason)
+	local notice = architecture .. "\0" .. reason
+	if vim.b[buffer].compiler_explorer_asm_notified_inference == notice then
 		return
+	end
+	vim.b[buffer].compiler_explorer_asm_notified_inference = notice
+	vim.notify(
+		"Compiler Explorer: inferred assembly architecture `"
+			.. architecture
+			.. "` because the buffer contains "
+			.. reason,
+		vim.log.levels.INFO
+	)
+end
+
+local function show_impl()
+	local buffer = api.nvim_get_current_buf()
+	local architecture, architecture_reason, inferred = resolve_architecture(buffer)
+	if not architecture then
+		vim.notify("Compiler Explorer: " .. architecture_reason, vim.log.levels.ERROR)
+		return
+	end
+	if inferred then
+		notify_inferred_architecture(buffer, architecture, architecture_reason)
 	end
 	local cursor = api.nvim_win_get_cursor(0)
 	local line = api.nvim_get_current_line()
@@ -733,27 +867,69 @@ function M.show()
 	require("compiler-explorer.async").void(show_impl)()
 end
 
+local function attach(buffer)
+	vim.keymap.set("n", "K", M.show, {
+		buffer = buffer,
+		desc = "Compiler Explorer: assembly instruction/register help",
+	})
+	api.nvim_buf_create_user_command(buffer, "CEAssemblyHelp", M.show, {
+		desc = "Show documentation for the assembly instruction or register under the cursor",
+		force = true,
+	})
+	api.nvim_buf_create_user_command(buffer, "CEAssemblyArchitecture", function(opts)
+		if opts.args ~= "" then
+			local architecture = normalize_architecture(opts.args)
+			if not supported_architectures[architecture] then
+				vim.notify(
+					"Compiler Explorer: unsupported assembly architecture `" .. opts.args .. "`",
+					vim.log.levels.ERROR
+				)
+				return
+			end
+			vim.b[buffer].compiler_explorer_asm_arch = architecture
+		end
+		local architecture, reason, inferred = resolve_architecture(buffer)
+		if architecture then
+			vim.notify(
+				"Compiler Explorer: assembly architecture is `"
+					.. architecture
+					.. "` ("
+					.. (inferred and "inferred from " or "selected by ")
+					.. reason
+					.. ")",
+				vim.log.levels.INFO
+			)
+		else
+			vim.notify("Compiler Explorer: " .. reason, vim.log.levels.ERROR)
+		end
+	end, {
+		nargs = "?",
+		complete = function()
+			local architectures = vim.tbl_keys(supported_architectures)
+			table.sort(architectures)
+			return architectures
+		end,
+		desc = "Show or override the assembly architecture used for documentation",
+		force = true,
+	})
+end
+
 function M.setup()
 	local group = api.nvim_create_augroup("CompilerExplorerAssemblyHelp", { clear = true })
 	api.nvim_create_autocmd("FileType", {
 		group = group,
 		pattern = "asm",
 		callback = function(event)
-			if not api.nvim_buf_get_name(event.buf):match("^compiler%-explorer://") then
-				return
-			end
-			vim.keymap.set("n", "K", M.show, {
-				buffer = event.buf,
-				desc = "Compiler Explorer: assembly instruction/register help",
-			})
-			api.nvim_buf_create_user_command(event.buf, "CEAssemblyHelp", M.show, {
-				desc = "Show documentation for the assembly instruction or register under the cursor",
-				force = true,
-			})
+			attach(event.buf)
 		end,
 	})
+	if vim.bo.filetype == "asm" then
+		attach(api.nvim_get_current_buf())
+	end
 end
 
 M._instruction_candidates = instruction_candidates
+M._notify_inferred_architecture = notify_inferred_architecture
+M._resolve_architecture = resolve_architecture
 
 return M

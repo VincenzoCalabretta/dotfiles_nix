@@ -198,14 +198,24 @@ The most useful commands are:
   label from an assembly buffer; and
 - `:CEDeleteCache` — clear the client's cached language/compiler catalog.
 
-Inside a Compiler Explorer assembly buffer, press `K` (or run
-`:CEAssemblyHelp`) for architecture-aware help. On an instruction, it uses the
-self-hosted Compiler Explorer's complete generated opcode documentation. On a
-register, it explains its width, aliases, and architectural role. When the
-cursor is on an operand or Intel size syntax such as `qword ptr`, the lookup
-automatically uses the instruction mnemonic from that line instead of invoking
-Neovim's manual-page lookup. The mapping is buffer-local and does not change
-`K` in source files or ordinary assembly buffers.
+In any assembly buffer, including ordinary `.s` and preprocessed `.S` source
+files, press `K` (or run `:CEAssemblyHelp`) for architecture-aware help. On an
+instruction, it uses the self-hosted Compiler Explorer's complete generated
+opcode documentation. On a register, it explains its width, aliases, and
+architectural role. When the cursor is on an operand or Intel size syntax such
+as `qword ptr`, the lookup automatically uses the instruction mnemonic from
+that line instead of invoking Neovim's manual-page lookup.
+
+Compiler Explorer output carries its architecture as metadata. For an ordinary
+assembly file, the first lookup infers the architecture from strong source
+evidence such as `.thumb`, `.intel_syntax`, an `rv64` attribute, or distinctive
+register syntax, and reports both the selected architecture and the evidence
+with its line number. If a file is ambiguous, set it buffer-locally with
+`:CEAssemblyArchitecture arm32` (supported values are `amd64`, `aarch64`,
+`arm32`, `riscv64`, `power`, `ptx`, `sass`, `avr`, `6502`, `65c816`, and
+`llvm`). Run `:CEAssemblyArchitecture` without an argument to display the
+current selection and its source. This buffer-local mapping does not change
+`K` in non-assembly buffers.
 
 Compiler diagnostics populate the quickfix list. Assembly/source line matches
 are highlighted as the cursor moves. Run `:help compiler-explorer-commands`
