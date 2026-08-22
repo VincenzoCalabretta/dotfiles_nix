@@ -138,6 +138,16 @@
             +qa
           touch "$out"
         '';
+        compiler-explorer-asm-help = pkgs.runCommand "compiler-explorer-asm-help-test" {
+          nativeBuildInputs = [ pkgs.neovim ];
+        } ''
+          export HOME="$TMPDIR"
+          nvim --headless --clean -u NONE \
+            '+set runtimepath+=${./dotfiles/nvim}' \
+            '+luafile ${./tests/compiler-explorer-asm-help.lua}' \
+            +qa
+          touch "$out"
+        '';
       };
     };
 }

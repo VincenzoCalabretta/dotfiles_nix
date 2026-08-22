@@ -53,6 +53,7 @@ return {
 				open_qflist = true,
 				split = "vsplit",
 			})
+			require("compiler_explorer_asm_help").setup()
 
 			vim.api.nvim_create_user_command("CECompileProject", function(opts)
 				require("compiler_explorer_project").compile(opts)
