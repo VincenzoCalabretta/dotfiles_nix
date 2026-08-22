@@ -35,6 +35,7 @@
       nixosModules.nvidia = import ./modules/nvidia.nix;
       nixosModules.wireshark = import ./modules/wireshark.nix;
       nixosModules.netdebug = import ./modules/netdebug.nix;
+      nixosModules.compiler-explorer = import ./modules/compiler-explorer.nix;
 
       # Generic terminal/editor/shell Home Manager profile: no personal
       # packages, no private flake inputs, no baked-in username/home
@@ -60,6 +61,8 @@
       };
 
       packages.${system} = {
+        compiler-explorer = pkgs.callPackage ./packages/compiler-explorer.nix { };
+
         # Set the login shell to zsh: `nix run .#set-default-shell`
         set-default-shell =
           pkgs.writeShellScriptBin "set-default-shell" ''
@@ -116,6 +119,10 @@
           forgejo-runner-module = ./modules/forgejo-runner.nix;
           netdebug-module = ./modules/netdebug.nix;
           wireshark-module = ./modules/wireshark.nix;
+        };
+        compiler-explorer-vm = import ./tests/compiler-explorer-vm.nix {
+          inherit pkgs;
+          compiler-explorer-module = ./modules/compiler-explorer.nix;
         };
       };
     };

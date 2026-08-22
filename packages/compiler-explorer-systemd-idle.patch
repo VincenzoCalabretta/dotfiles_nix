@@ -1,0 +1,39 @@
+diff --git a/lib/app/server-listening.ts b/lib/app/server-listening.ts
+index 3c05b52..8822587 100644
+--- a/lib/app/server-listening.ts
++++ b/lib/app/server-listening.ts
+@@ -57,19 +57,21 @@ function setupSystemdSocketListening(webServer: express.Express, ss: {fd: number
+     const idleTimeout = process.env.IDLE_TIMEOUT;
+     const timeout = (idleTimeout === undefined ? 300 : Number.parseInt(idleTimeout, 10)) * 1000;
+     if (idleTimeout) {
+-        setupIdleTimeout(webServer, timeout);
++        const resetIdleTimeout = setupIdleTimeout(timeout);
++        const server = webServer.listen(ss);
++        server.on('request', resetIdleTimeout);
+         logger.info(`  IDLE_TIMEOUT: ${idleTimeout}`);
++    } else {
++        webServer.listen(ss);
+     }
+     logger.info(`  Listening on systemd socket: ${JSON.stringify(ss)}`);
+-    webServer.listen(ss);
+ }
+ 
+ /**
+  * Set up idle timeout for systemd socket
+- * @param webServer - Express web server
+  * @param timeout - Timeout in milliseconds
+  */
+-function setupIdleTimeout(webServer: express.Express, timeout: number): void {
++function setupIdleTimeout(timeout: number): () => void {
+     const exit = () => {
+         logger.info('Inactivity timeout reached, exiting.');
+         process.exit(0);
+@@ -79,7 +81,7 @@ function setupIdleTimeout(webServer: express.Express, timeout: number): void {
+         clearTimeout(idleTimer);
+         idleTimer = setTimeout(exit, timeout);
+     };
+-    webServer.all('*', reset);
++    return reset;
+ }
+ 
+ /**

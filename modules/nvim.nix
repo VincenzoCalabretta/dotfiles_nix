@@ -1,7 +1,21 @@
-{ pkgs, ... }:
+{ config, lib, pkgs, ... }:
 
+let
+  cfg = config.dotfiles.nvim.compilerExplorer;
+in
 {
-  home.packages = with pkgs; [
+  options.dotfiles.nvim.compilerExplorer = {
+    enable = lib.mkEnableOption "the Compiler Explorer Neovim client";
+
+    url = lib.mkOption {
+      type = lib.types.str;
+      default = "http://127.0.0.1:10240";
+      description = "Compiler Explorer API base URL used by compiler-explorer.nvim.";
+    };
+  };
+
+  config = {
+    home.packages = with pkgs; [
     neovim
 
     # Build deps for lazy.nvim / telescope-fzf-native / treesitter.
@@ -32,7 +46,12 @@
     rust-analyzer
     clang-tools     # provides clangd
     nixd            # Nix LSP; also used by opencode (modules/opencode.nix)
-  ];
+    ];
 
-  xdg.configFile."nvim".source = ../dotfiles/nvim;
+    xdg.configFile."nvim".source = ../dotfiles/nvim;
+
+    home.sessionVariables = lib.mkIf cfg.enable {
+      COMPILER_EXPLORER_URL = cfg.url;
+    };
+  };
 }

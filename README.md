@@ -132,9 +132,62 @@ Notable local code includes:
 - custom DAP configuration, UI, trace, and project modules;
 - GDB launch helpers and libstdc++/project pretty-printers;
 - project/session persistence and Git inspection;
-- a scratchpad hover workflow and numeric-conversion utilities; and
+- a scratchpad hover workflow and numeric-conversion utilities;
+- an opt-in Compiler Explorer client for a configurable self-hosted API; and
 - Treesitter, completion, diagnostics, profiler, aerial, telescope, and
   diff/history integrations.
+
+#### Compiler Explorer
+
+Enable the client in a Home Manager profile with
+`dotfiles.nvim.compilerExplorer.enable = true`. It defaults to
+`http://127.0.0.1:10240`; override `dotfiles.nvim.compilerExplorer.url` for a
+different self-hosted endpoint. The matching opt-in NixOS service is exported
+as `nixosModules.compiler-explorer` and enabled with
+`dotfiles.compiler-explorer.enable = true`. It is socket-activated, binds only
+to loopback, and exposes the flake-pinned GCC, Clang, and Rust toolchains.
+
+After rebuilding NixOS and activating the Home Manager generation, open a C,
+C++, or Rust buffer in Neovim and press `<leader>ce`. The first invocation asks
+which local compiler to use and which flags to pass, then opens the generated
+assembly in a vertical split. Select a range in visual mode and press the same
+mapping to compile only that selection. The service starts automatically on
+the first request and exits after five minutes without a request, so an
+inactive `compiler-explorer.service` while `compiler-explorer.socket` remains
+active is normal.
+
+The most useful commands are:
+
+- `:CECompile` — compile the current buffer or visual selection;
+- `:CECompileLive` — compile now and recompile after each save;
+- `:CECompile compiler=nix-gcc-cpp flags=-O2\ -Wall` — select a compiler and
+  flags without prompts (`nix-gcc-c`, `nix-clang-c`, `nix-gcc-cpp`,
+  `nix-clang-cpp`, and `nix-rustc` are available);
+- `:CECompile!` — create another assembly window instead of reusing the last
+  one;
+- `:CEFormat`, `:CEAddLibrary`, and `:CELoadExample` — use the corresponding
+  capabilities advertised by the local server;
+- `:CEOpenWebsite` — open the current source/compiler state in the self-hosted
+  web interface;
+- `:CEShowTooltip` and `:CEGotoLabel` — inspect an instruction or jump to a
+  label from an assembly buffer; and
+- `:CEDeleteCache` — clear the client's cached language/compiler catalog.
+
+Compiler diagnostics populate the quickfix list. Assembly/source line matches
+are highlighted as the cursor moves. Run `:help compiler-explorer-commands`
+for every filter and argument, including binary output and Intel versus AT&T
+syntax.
+
+To verify or troubleshoot the local service outside Neovim:
+
+```console
+systemctl status compiler-explorer.socket
+curl -fsS http://127.0.0.1:10240/api/languages
+journalctl --unit compiler-explorer.service --since today
+```
+
+Compilation is deliberately non-executable: the service returns assembly and
+diagnostics but will not run submitted programs.
 
 ### tmux, i3, shell and terminal
 
@@ -159,6 +212,7 @@ Git, and daily CLI utilities are part of the same activation closure.
 | `nvidia` | `dotfiles.nvidia.intelBusId`/`.nvidiaBusId` (no default — `lspci -nn \| grep -Ei 'vga\|3d'` on the actual machine). |
 | `wireshark` | `dotfiles.wireshark.user` (no default). |
 | `netdebug` | `dotfiles.netdebug.user` (no default). |
+| `compiler-explorer` | Nothing; optionally override `dotfiles.compiler-explorer.port` or `.idleTimeoutSec`. |
 
 None of these hardcode a username, host identity, or secret — see
 `configuration.nix.example` for how a consumer wires them up:

@@ -2,7 +2,7 @@
 -- Each entry: { key, desc, category, hint (optional) }
 -- 'key' uses the exact notation the user would type/see in config.
 
-return {
+local mappings = {
 	-- ── LSP ────────────────────────────────────────────────────────────────────
 	{ key = "gd", desc = "Go to definition of symbol under cursor", category = "LSP" },
 	{ key = "gr", desc = "List all references to symbol", category = "LSP" },
@@ -232,3 +232,13 @@ return {
 	{ key = "<leader>x", desc = "Execute current line as Lua", category = "Misc" },
 	{ key = "<leader><leader>x", desc = "Source / execute the current Lua file", category = "Misc" },
 }
+
+if vim.env.COMPILER_EXPLORER_URL then
+	table.insert(mappings, {
+		key = "<leader>ce",
+		desc = "Compile the current buffer or selection in Compiler Explorer",
+		category = "Compiler Explorer",
+	})
+end
+
+return mappings
