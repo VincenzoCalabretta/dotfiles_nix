@@ -204,7 +204,9 @@ instruction, it uses the self-hosted Compiler Explorer's complete generated
 opcode documentation. On a register, it explains its width, aliases, and
 architectural role. When the cursor is on an operand or Intel size syntax such
 as `qword ptr`, the lookup automatically uses the instruction mnemonic from
-that line instead of invoking Neovim's manual-page lookup.
+that line instead of invoking Neovim's manual-page lookup. Press `K` again to
+focus the documentation window for scrolling or navigation, and `q` there to
+close it.
 
 Compiler Explorer output carries its architecture as metadata. For an ordinary
 assembly file, the first lookup infers the architecture from strong source

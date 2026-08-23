@@ -795,11 +795,12 @@ local function instruction_candidates(token, mnemonic)
 end
 
 local function open_preview(lines)
-	vim.lsp.util.open_floating_preview(lines, "markdown", {
+	return vim.lsp.util.open_floating_preview(lines, "markdown", {
 		wrap = true,
 		close_events = { "CursorMoved", "InsertEnter", "BufHidden" },
 		border = "single",
 		focusable = true,
+		focus_id = "compiler_explorer_assembly_help",
 	})
 end
 
@@ -930,6 +931,7 @@ end
 
 M._instruction_candidates = instruction_candidates
 M._notify_inferred_architecture = notify_inferred_architecture
+M._open_preview = open_preview
 M._resolve_architecture = resolve_architecture
 
 return M
