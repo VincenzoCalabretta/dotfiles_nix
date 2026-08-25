@@ -37,6 +37,11 @@ in
     tree-sitter
     nodejs
 
+    # peek.nvim: builds its Deno-based preview server (build step in
+    # plugins/peek.lua) and `app = "browser"` still shells out to the
+    # `deno` binary at runtime to serve the preview.
+    deno
+
     # ripgrep + fd are shared (see home.nix).
 
     # GDB + bundled pretty-printer scripts in dotfiles/nvim/gdb/
