@@ -98,6 +98,38 @@ Create a `.nvim-dap.lua` file at the **root of each repository**. The file is
 executed with `dofile()` and must return a table. Any key you omit falls back to
 the defaults shown below.
 
+Open Neovim from that same repository root: the integration looks only for
+`$PWD/.nvim-dap.lua`; it does not walk up parent directories. The file is Lua,
+not JSON or YAML, and it is re-read each time a Bazel launcher starts. Treat it
+as trusted project code: do not open an untrusted repository and launch DAP.
+
+### New-project quick start
+
+For a new C++ project that builds and runs on the host, create this file and
+replace `gdbnf` with the debug configuration from the project's `.bazelrc`:
+
+```lua
+-- <project-root>/.nvim-dap.lua
+return {
+  cpp = {
+    bazel_config   = "gdbnf",
+    gdbserver_port = 1234,
+    bazel_bin      = "bazel", -- use "bazelisk" here when appropriate
+    bazel_cache    = vim.fn.expand("~/.cache/bazel"),
+  },
+}
+```
+
+Then add a matching `.bazelrc` configuration (shown in
+[Required `.bazelrc` configs](#required-bazelrc-configs)), start Neovim from
+the project root, and use `<leader>gc` to select a C++ target. The launcher
+executes `bazel run --config=gdbnf <target>`, waits for its `gdbserver`, and
+attaches GDB.
+
+For Python or Rust, add the corresponding `python` or `rust` table from the
+full example below. Tables are merged with the defaults, so a project only
+needs to specify values it changes.
+
 ### Minimal host-only example
 
 ```lua
@@ -180,6 +212,83 @@ return {
   },
 }
 ```
+
+`container_name` changes where the **Bazel command** is run; it is not a DAP
+host setting. C++ and Rust sessions always attach to a port on the local
+machine. For a service running on a separate device, use an SSH port forward as
+described below.
+
+---
+
+## Remote GDB server on a target device
+
+Use this when the program is already running on a board, VM, or other target
+under `gdbserver`. The Bazel launcher is for starting a local/container Bazel
+target, so do **not** use `<leader>gc` for this case: it would start another
+`bazel run`. Instead, make the target's GDB port available locally and use the
+built-in C++ attach configuration.
+
+### 1. Start `gdbserver` on the target
+
+Install a `gdbserver` compatible with the target program and start it with the
+binary and its arguments. Binding to loopback keeps the debugger port off the
+network:
+
+```sh
+# On the target device
+gdbserver 127.0.0.1:1234 /opt/my-app/bin/my-app --target-argument
+```
+
+If the process is already running, attach by PID instead:
+
+```sh
+gdbserver 127.0.0.1:1234 --attach 4242
+```
+
+### 2. Forward the target port to the development machine
+
+In a separate terminal on the machine running Neovim:
+
+```sh
+ssh -N -L 1234:127.0.0.1:1234 user@target.example
+```
+
+The stock attach configuration connects to `localhost:1234`, so no remote host
+name needs to be placed in `.nvim-dap.lua`. Choose another unused local port if
+needed and update the attach command in the next step to use it.
+
+### 3. Attach from Neovim
+
+Start Neovim at the source-tree root and open a C or C++ source file. Press
+`<M-c>` (DAP Continue / Start) and choose **Attach to gdbserver**. This is the
+predefined attach configuration; it connects to `localhost:1234` and uses the
+current working directory for source lookup.
+
+For a non-default forwarded port, or to set extra GDB commands such as a source
+path substitution, run this once in Neovim (adjust the values):
+
+```vim
+:lua << EOF
+require("dap").run({
+  name = "Target gdbserver",
+  type = "gdb",
+  request = "attach",
+  target = "localhost:2345",
+  cwd = vim.fn.getcwd(),
+  setupCommands = {
+    { text = "directory " .. vim.fn.getcwd(), ignoreFailures = false },
+    { text = "set substitute-path /build-agent/workspace " .. vim.fn.getcwd(), ignoreFailures = true },
+  },
+})
+EOF
+```
+
+The host GDB must understand the target architecture and be able to read the
+unstripped executable's debug symbols. Usually that means installing a
+cross-GDB (or setting the configured `gdb` command to one) and building or
+copying matching symbols locally. If stack frames refer to build-machine paths,
+use `:DapDiagFrame` to inspect them, then add an appropriate `set
+substitute-path` command as in the example above.
 
 ---
 
@@ -311,28 +420,30 @@ the host, or set `bazel_cache` to the container-internal path and accept that
 
 | Key | Action |
 |---|---|
-| `<leader>dc` | Continue / Start |
-| `<leader>dn` | Step over |
-| `<leader>di` | Step into |
-| `<leader>do` | Step out |
-| `<leader>db` | Toggle breakpoint |
-| `<leader>dB` | Conditional breakpoint |
-| `<leader>dT` | Terminate session |
-| `<leader>dr` | Toggle REPL |
-| `<leader>da` | Add watch (variable under cursor) |
-| `<leader>dv` | Open DAP view |
-| `<leader>dV` | Close DAP view |
+| `<M-c>` | Continue / Start |
+| `<M-n>` | Step over |
+| `<M-s>` | Step into |
+| `<M-o>` | Step out |
+| `<M-b>` | Toggle breakpoint |
+| `<M-B>` | Conditional breakpoint |
+| `<M-t>` | Terminate session |
+| `<M-r>` | Toggle REPL |
+| `<M-w>` | Add watch (variable under cursor) |
+| `<M-f>` | Jump to the current frame |
+| `<M-p>` | Pause / interrupt |
+| `<leader>gv` / `<leader>gV` | Open / close DAP view |
 
 ### Bazel launchers
 
 | Key | Action |
 |---|---|
-| `<leader>dt` | C++ — Telescope picker (`cc_binary`, `cc_test`) |
-| `<leader>dp` | Python — Telescope picker (`py_binary`, `py_test`) |
-| `<leader>du` | Rust — Telescope picker (`rust_binary`, `rust_test`) |
-| `<leader>dU` | Rust — Manual target input |
-| `<leader>dP` | Python — Manual target input |
-| `<leader>dl` | Re-launch last used target (any language) |
+| `<leader>gc` | C++ — Telescope picker (`cc_binary`, `cc_test`) |
+| `<leader>gp` | Python — Telescope picker (`py_binary`, `py_test`) |
+| `<leader>gP` | Python — manual target input |
+| `<leader>gr` | Rust — Telescope picker (`rust_binary`, `rust_test`) |
+| `<leader>gR` | Rust — manual target input |
+| `<leader>gl` | Re-launch last used target (any language) |
+| `<leader>gs` | Attach to the predefined SIL GDB servers (`:1234`, `:1235`) |
 
 ### Telescope DAP extensions
 
@@ -372,28 +483,28 @@ Inside the recent-targets picker:
 1. Ensure the container is running with port 1234 exposed.
 2. Open Neovim from the project root (the same directory that is mounted into
    the container).
-3. Press `<leader>dt` → Telescope shows all `cc_binary` and `cc_test` targets.
+3. Press `<leader>gc` → Telescope shows all `cc_binary` and `cc_test` targets.
 4. Select a target. The launcher:
    - Kills any existing gdbserver process.
    - Runs `docker exec -i dev bash -c "cd <cwd> && bazel run --config=gdbnf <target>"`.
-   - Polls `127.0.0.1:1234` every 100 ms until the port is open.
+   - Waits for gdbserver to report that it is listening on port 1234.
    - Attaches gdb in DAP MI mode.
-5. Set breakpoints normally with `<leader>db`. Use `<leader>dc` to continue.
+5. Set breakpoints normally with `<M-b>`. Use `<M-c>` to continue.
 
 ### Python target in devcontainer
 
 1. Ensure the container is running with port 5678 exposed.
-2. Press `<leader>dp` → Telescope shows all `py_binary` and `py_test` targets.
+2. Press `<leader>gp` → Telescope shows all `py_binary` and `py_test` targets.
 3. Select a target. The launcher:
    - Runs `docker exec -i dev bash -c "cd <cwd> && bazel run --config=debugpy <target>"`.
    - Monitors stdout and stderr for the `"Listening on"` message from debugpy.
    - Creates a dynamic adapter `python_bazel_5678` and calls `dap.run()`.
-4. debugpy pauses at the first line (`--wait-for-client`). Press `<leader>dc`
+4. debugpy pauses at the first line (`--wait-for-client`). Press `<M-c>`
    to continue to your first breakpoint.
 
 ### Re-launching
 
-`<leader>dl` re-launches the last target (persisted across Neovim restarts in
+`<leader>gl` re-launches the last target (persisted across Neovim restarts in
 `~/.cache/nvim/nvim-dap-bazel/last_target.json`) without opening the picker.
 Useful when iterating on a single test.
 
