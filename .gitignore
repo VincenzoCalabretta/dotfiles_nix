@@ -1,3 +1,7 @@
+# Nix build outputs. `nix build ... -o out/<name>` (see README's "Safe
+# evaluation and testing") puts all result symlinks here; the bare
+# patterns stay as a safety net for anyone who forgets the -o flag.
+out/
 result
 result-*
 .direnv/

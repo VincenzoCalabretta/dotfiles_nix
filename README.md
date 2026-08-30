@@ -279,13 +279,25 @@ None of these hardcode a username, host identity, or secret — see
 nix flake check --no-build
 
 # Build the base Home Manager profile under a placeholder identity.
-nix build .#checks.x86_64-linux.home-manager-build
+nix build .#checks.x86_64-linux.home-manager-build -o out/home-manager-build
 
 # Run the NixOS VM integration test for the shared modules (wireguard,
 # forgejo-runner, netdebug, wireshark) — proves they produce the state their
 # option docs promise, independent of any concrete host.
-nix build .#checks.x86_64-linux.checklist-vm -L
+nix build .#checks.x86_64-linux.checklist-vm -L -o out/checklist-vm
+
+# Run the dap_modules Neovim plugin's own unit test suite hermetically
+# (nixpkgs vimPlugins, no lazy.nvim install or network needed) and produce
+# its line-coverage HTML report — see dotfiles/nvim/lua/dap_modules/README.md's
+# "Testing" section.
+nix build .#checks.x86_64-linux.dap-modules-coverage -o out/dap-modules-coverage
+# -> out/dap-modules-coverage/index.html
 ```
+
+`-o out/<name>` keeps result symlinks out of the repo root, in the
+gitignored `out/` directory, instead of the default `./result`. Omitting
+`-o` still works (`result`/`result-*` stay gitignored too) but clutters the
+root, so prefer `-o out/<name>` for anything you intend to keep around.
 
 The complete local gate is `nix flake check` — it requires no private
 inputs and no network access beyond the standard Nix substituters.

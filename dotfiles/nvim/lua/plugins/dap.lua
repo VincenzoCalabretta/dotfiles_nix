@@ -147,11 +147,11 @@ local core = {
     { "<leader>gv", "<cmd>DapViewOpen<cr>",  desc = "DAP: Open View"  },
     { "<leader>gV", "<cmd>DapViewClose<cr>", desc = "DAP: Close View" },
 
-    -- SIL (FSW + SIM)
+    -- Dual gdbserver attach
     {
       "<leader>gs",
-      function() require("dap_modules.bazel").connect_sil() end,
-      desc = "DAP: Connect to SIL (FSW :1234 + SIM :1235)",
+      function() require("dap_modules.bazel").connect_dual() end,
+      desc = "DAP: Attach to dual gdbservers (:1234 + :1235)",
     },
 
     -- C++
@@ -164,6 +164,11 @@ local core = {
       "<leader>gl",
       function() require("dap_modules.bazel").launch_last() end,
       desc = "DAP: Relaunch Last Target",
+    },
+    {
+      "<leader>gd",
+      function() require("dap_modules.remote").launch("cpp") end,
+      desc = "DAP: Deploy & Debug Remote C++ Target (SSH)",
     },
 
     -- Python

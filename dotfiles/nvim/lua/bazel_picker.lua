@@ -8,7 +8,7 @@
 -- appropriate name and then clearing and writing in that buffer
 -- TODO: add a <leader>bl to edit the latest runtime logs from the latest bazel target
 -- that has been executed. For example
--- /Users/vincenzo/.cache/dev/bazel/53cee22ebd2ed064cbfe40eff718d5a9/execroot/_main/bazel-out/aarch64-fastbuild/testlogs/fsw/components/gnc/thruster_dispatcher/thruster_dispatcher_test/test.log
+-- /Users/user/.cache/dev/bazel/53cee22ebd2ed064cbfe40eff718d5a9/execroot/_main/bazel-out/aarch64-fastbuild/testlogs/some/component/foo_test/test.log
 -- the current command logs are not usefule
 -- TODO: the fact that the output of an execution is in terminal mode, makes
 -- it very difficult to copy paths.
@@ -32,13 +32,16 @@ M.watch_autocmd_id = nil
 -- Store job buffers and log files for each target
 M.target_buffers = {}  -- Maps target_key -> {buffer_ids = {}, log_files = {}}
 
--- Generate a unique key for a target+config+action combination
-local function get_target_key(target, config, action_type)
+-- Generate a unique key for a target+config+action combination.
+-- Exported (with add_to_recent below) so tests/bazel_picker_spec.lua can
+-- assert on the dedup/cap-at-3 recent-target bookkeeping directly.
+function M.get_target_key(target, config, action_type)
   return string.format("%s|%s|%s", target, config or "default", action_type)
 end
+local get_target_key = M.get_target_key
 
 -- Function to add target to recent history
-local function add_to_recent(target, config, action_type)
+function M.add_to_recent(target, config, action_type)
   local entry = {
     target = target,
     config = config,
@@ -64,6 +67,7 @@ local function add_to_recent(target, config, action_type)
     table.remove(M.recent_targets)
   end
 end
+local add_to_recent = M.add_to_recent
 
 -- Get Bazel log file location
 local function get_bazel_log_path()

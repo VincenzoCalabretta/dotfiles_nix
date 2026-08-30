@@ -1,0 +1,11 @@
+load("@rules_python//python:defs.bzl", "py_binary")
+
+# Minimal target for exercising dap_modules' debugpy flow. `debugpy` itself
+# is invoked by the `.bazelrc` `debugpy` config's --run_under wrapper (a
+# plain `python3 -m debugpy ...` on whatever interpreter is on PATH), so this
+# target needs no debugpy dependency of its own.
+py_binary(
+    name = "hello_debug",
+    srcs = ["hello_debug.py"],
+    visibility = ["//visibility:public"],
+)

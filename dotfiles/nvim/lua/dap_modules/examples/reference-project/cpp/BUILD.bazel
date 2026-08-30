@@ -1,0 +1,12 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+
+# Minimal target for exercising dap_modules' gdbserver flow. Debug flags
+# (-g, no optimization) come from `.bazelrc`'s `gdbnf` config, not copts
+# here, matching how larger monorepos in this space keep debug builds a
+# --config flag rather than a per-target property.
+cc_binary(
+    name = "hello_debug",
+    srcs = ["hello_debug.cc"],
+    copts = ["-fno-omit-frame-pointer"],
+    visibility = ["//visibility:public"],
+)

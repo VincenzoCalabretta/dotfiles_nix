@@ -1,0 +1,32 @@
+# Reference .bazelrc for dap_modules -- see ../../README.md, in particular
+# "Required .bazelrc configs" and "Remote deployment over SSH".
+#
+# `gdbnf` and `debugpy` here are deliberately the exact names, ports, and
+# `run_under` shape dap_modules.project already assumes by default (see
+# project.lua). Nothing in .nvim-dap.lua needs to change to use them; it's
+# included in this example only to make the schema explicit. Larger
+# Bazel monorepos in this space (flight-software / robotics) commonly use
+# these same two names already -- see this directory's README.md
+# "Compatibility" section.
+
+# C++ / Rust: build with full debug info, then run under gdbserver bound to
+# a fixed local port so a locally-run gdb can attach to it.
+build:gdbnf --compilation_mode=dbg
+build:gdbnf --copt=-fno-omit-frame-pointer
+build:gdbnf --strip=never
+run:gdbnf --run_under="gdbserver :1234"
+
+# Python: run under debugpy, paused until Neovim attaches.
+build:debugpy --compilation_mode=dbg
+run:debugpy --run_under="python3 -m debugpy --listen 0.0.0.0:5678 --wait-for-client"
+
+# Remote deployment over SSH (dap_modules/remote.lua) -- cross-compile only:
+# no `run_under` here, since remote.lua starts gdbserver itself once the
+# binary has been rsynced to the target. Uncomment and point
+# --platforms/--extra_toolchains at your own registered cross-toolchain to
+# use <leader>gd / :DapRemoteDebug against a real board.
+#
+# build:remote-arm64 --platforms=//platforms:arm64-linux
+# build:remote-arm64 --compilation_mode=dbg
+# build:remote-arm64 --copt=-fno-omit-frame-pointer
+# build:remote-arm64 --strip=never

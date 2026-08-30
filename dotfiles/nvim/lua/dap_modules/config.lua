@@ -27,24 +27,23 @@ function M.setup(bazel)
 
   local _iex         = "-iex"
   local _stdcxx_src  = "source " .. vim.fn.stdpath('config') .. "/gdb/stdcxx_printers.py"
-  local _encore_src  = "source " .. vim.fn.stdpath('config') .. "/gdb/encore_printers.py"
 
   -- GDB (C++ via gdbserver)
   dap.adapters.gdb = {
     type    = "executable",
     command = "gdb",
-    args    = { _iex, _stdcxx_src, _iex, _encore_src, "-i", "dap" },
+    args    = { _iex, _stdcxx_src, "-i", "dap" },
   }
 
-  -- GDB for SIL sessions: --nx skips ~/.gdbinit to avoid init-file conflicts
-  -- when two gdb processes start concurrently (FSW :1234 + SIM :1235).
+  -- GDB for dual-target sessions: --nx skips ~/.gdbinit to avoid init-file
+  -- conflicts when two gdb processes start concurrently (:1234 + :1235).
   -- -iex runs before --nx takes effect so printers still load.
   -- initialize_timeout_sec is raised because gdb can be slow to attach when
   -- the target process is already running under gdbserver.
-  dap.adapters.gdb_sil = {
+  dap.adapters.gdb_dual = {
     type    = "executable",
     command = "gdb",
-    args    = { _iex, _stdcxx_src, _iex, _encore_src, "--nx", "-i", "dap" },
+    args    = { _iex, _stdcxx_src, "--nx", "-i", "dap" },
     options = { initialize_timeout_sec = 30 },
   }
 
@@ -59,7 +58,6 @@ function M.setup(bazel)
   local workspace      = vim.fn.getcwd()
   local bazel_cache    = vim.fn.expand("~/.cache/dev/bazel")
   local printer_cmd    = "source " .. vim.fn.stdpath('config') .. '/gdb/stdcxx_printers.py'
-  local encore_cmd     = "source " .. vim.fn.stdpath('config') .. '/gdb/encore_printers.py'
 
   dap.configurations.cpp = {
     {
@@ -82,11 +80,6 @@ function M.setup(bazel)
         {
           description    = "Load libstdc++ pretty-printers",
           text           = printer_cmd,
-          ignoreFailures = true,
-        },
-        {
-          description    = "Load Encore project pretty-printers",
-          text           = encore_cmd,
           ignoreFailures = true,
         },
         {
@@ -234,6 +227,19 @@ function M.setup(bazel)
   vim.api.nvim_create_user_command("DapTraceShow", function()
     trace.show()
   end, { desc = "Stop collection and display the execution timeline" })
+
+  -- ── Remote SSH deploy + debug ──────────────────────────────────────────────
+  -- <leader>gd is the C++ shortcut (see plugins/dap.lua); this command covers
+  -- Rust too and is the only entry point exposed for it since a second
+  -- dedicated keybinding wasn't worth the mnemonic clash with <leader>gr/gR.
+  vim.api.nvim_create_user_command("DapRemoteDebug", function(o)
+    local lang = o.args ~= "" and o.args or "cpp"
+    require("dap_modules.remote").launch(lang)
+  end, {
+    nargs = "?",
+    complete = function() return { "cpp", "rust" } end,
+    desc = "Deploy & debug a Bazel target on a remote host over SSH (lang: cpp|rust, default cpp)",
+  })
 
   -- ── Diagnostic: dump raw DAP frame + stackTrace response ──────────────────
   -- :DapDiagFrame — run when stopped to see what GDB reports for source paths.

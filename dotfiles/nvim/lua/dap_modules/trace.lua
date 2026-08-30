@@ -1,5 +1,5 @@
 -- ~/.config/nvim/lua/dap_modules/trace.lua
--- GDB tracepoint timeline for SIL debugging.
+-- GDB tracepoint timeline for non-stopping trace collection.
 --
 -- GDB in DAP mode (-i dap) evaluates `context = "repl"` requests as raw CLI
 -- commands and returns their output in resp.result. The MI wrapper
@@ -8,7 +8,7 @@
 -- Workflow:
 --   1. Session connected and paused (after <leader>gs)
 --   2. <leader>gtt  — place tracepoint on function under cursor
---   3. <leader>gts  — tstart; FSW/SIM resume and log hits non-intrusively
+--   3. <leader>gts  — tstart; the target resumes and logs hits non-intrusively
 --   4. <leader>gtv  — tstop + collect all frames → timeline buffer
 --
 -- Timestamps come from $trace_timestamp (hardware trace unit).
@@ -33,7 +33,11 @@ local function gdb(session, cmd, cb)
 end
 
 -- Parse the integer value out of GDB print output: "$N = 42" → 42
-local function parse_int(result)
+-- Exported (along with the two parsers below) purely so
+-- tests/trace_spec.lua can assert on GDB CLI output parsing directly,
+-- without a live session — this string-scraping is the most fragile part
+-- of the module (breaks silently if GDB's CLI output format ever shifts).
+function M.parse_int(result)
   return result and tonumber(result:match("=%s*(%d+)")) or 0
 end
 
@@ -41,7 +45,7 @@ end
 -- Handles both forms:
 --   "#0  FuncName (args) at file.cc:42"        (no address)
 --   "#0  0xdeadbeef in FuncName (args) at ..."  (with address)
-local function parse_frame_func(result)
+function M.parse_frame_func(result)
   if not result then return "?" end
   return result:match("%sin%s+(.-)%s*%(")    -- "... in FuncName ("
       or result:match("#%d+%s+(.-)%s*%(")    -- "#0  FuncName ("
@@ -49,7 +53,7 @@ local function parse_frame_func(result)
 end
 
 -- True when a tfind command found no more frames (either via err or output).
-local function tfind_exhausted(err, resp)
+function M.tfind_exhausted(err, resp)
   if err then return true end
   local r = resp and resp.result or ""
   return r:match("[Nn]o trace frame")
@@ -129,16 +133,16 @@ local function collect_frames(session, frames, on_done)
 
   -- Timestamp (nanoseconds). 0 when the gdbserver doesn't supply it.
   gdb(session, "print $trace_timestamp", function(_, ts_resp)
-    local ts = parse_int(ts_resp and ts_resp.result)
+    local ts = M.parse_int(ts_resp and ts_resp.result)
 
     -- Function name from the current frame context.
     gdb(session, "frame", function(_, frame_resp)
-      local func = parse_frame_func(frame_resp and frame_resp.result)
+      local func = M.parse_frame_func(frame_resp and frame_resp.result)
       table.insert(frames, { ts = ts, func = func })
 
       -- Advance; both err and output are checked for exhaustion.
       gdb(session, "tfind", function(err, next_resp)
-        if tfind_exhausted(err, next_resp) then
+        if M.tfind_exhausted(err, next_resp) then
           on_done(frames, false)
         else
           collect_frames(session, frames, on_done)

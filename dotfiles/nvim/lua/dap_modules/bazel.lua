@@ -18,10 +18,16 @@ vim.fn.mkdir(M.cache_dir, "p")
 
 -- ── Persistence ──────────────────────────────────────────────────────────────
 
-function M.save_last_target(target, lang)
+-- `extra` is an optional table merged into the saved record (e.g. { host = "board_a" }
+-- for remote targets, so launch_last() knows which host to redeploy to).
+function M.save_last_target(target, lang, extra)
+  local data = { target = target, lang = lang }
+  if extra then
+    for k, v in pairs(extra) do data[k] = v end
+  end
   local file = io.open(M.last_target_file, "w")
   if file then
-    file:write(vim.fn.json_encode({ target = target, lang = lang }))
+    file:write(vim.fn.json_encode(data))
     file:close()
   end
 end
@@ -103,11 +109,13 @@ local function wait_for_port(host, port, timeout_ms, on_ready)
   return timer
 end
 
--- Internal: start a background job and auto-connect DAP when ready_pattern appears.
+-- Start a background job and auto-connect DAP when ready_pattern appears.
 -- Both stdout and stderr are monitored since some tools (e.g. debugpy) write
 -- their ready message to stderr.
 -- on_ready is a callback invoked (after a 1s delay) when the pattern is matched.
-local function start_job(cmd, ready_pattern, label, on_ready)
+-- Exported so dap_modules/remote.lua can reuse the same ready-pattern watcher
+-- for gdbserver started over SSH instead of locally/in a container.
+function M.start_job(cmd, ready_pattern, label, on_ready)
   local triggered = false  -- fire on_ready exactly once
 
   local function handle_line(line)
@@ -151,22 +159,34 @@ end
 -- The script checks bundled printers first, then system paths, so it works
 -- on any machine the config is synced to without extra system packages.
 local _printer_cmd = "source " .. vim.fn.stdpath('config') .. '/gdb/stdcxx_printers.py'
+M.printer_cmd = _printer_cmd  -- exported for dap_modules/remote.lua's custom gdb adapters
+
+-- Shared setupCommands for every dynamic gdb attach (local Bazel launch,
+-- dual-target attach, remote SSH deploy). `extra` commands are run first —
+-- e.g. the dual-target canary or the remote launcher's `file <local-binary>`
+-- (see remote.lua for why that one is required there but not here).
+function M.gdb_setup_commands(workspace, bazel_cache, extra)
+  local cmds = {}
+  if extra then vim.list_extend(cmds, extra) end
+  vim.list_extend(cmds, {
+    { text = "-enable-pretty-printing",    ignoreFailures = false },
+    { text = _printer_cmd,                 ignoreFailures = true },
+    { text = "set print object on",        ignoreFailures = true },
+    { text = "directory " .. workspace,    ignoreFailures = false },
+    { text = "set debug-file-directory " .. bazel_cache, ignoreFailures = true },
+  })
+  return cmds
+end
 
 local function connect_gdb(target, port, workspace, bazel_cache)
   local dap = require("dap")
   dap.run({
-    name    = "Attach to gdbserver (Bazel) – " .. target,
-    type    = "gdb",
-    request = "attach",
-    target  = "localhost:" .. port,
-    cwd     = workspace,
-    setupCommands = {
-      { text = "-enable-pretty-printing",    ignoreFailures = false },
-      { text = _printer_cmd,                 ignoreFailures = true },
-      { text = "set print object on",        ignoreFailures = true },
-      { text = "directory " .. workspace,    ignoreFailures = false },
-      { text = "set debug-file-directory " .. bazel_cache, ignoreFailures = true },
-    },
+    name          = "Attach to gdbserver (Bazel) – " .. target,
+    type          = "gdb",
+    request       = "attach",
+    target        = "localhost:" .. port,
+    cwd           = workspace,
+    setupCommands = M.gdb_setup_commands(workspace, bazel_cache),
   })
 end
 
@@ -183,7 +203,7 @@ function M.start_cpp(target)
 
   print(string.format("Starting gdbserver for: %s (port %d)", target, port))
 
-  M.gdbserver_job_id = start_job(
+  M.gdbserver_job_id = M.start_job(
     cmd,
     "Listening on port " .. port,
     "gdbserver",
@@ -208,7 +228,7 @@ function M.start_python(target)
 
   print(string.format("Starting debugpy for: %s (port %d)", target, port))
 
-  M.gdbserver_job_id = start_job(cmd, "Listening on", "debugpy", function()
+  M.gdbserver_job_id = M.start_job(cmd, "Listening on", "debugpy", function()
     print("Connecting DAP to debugpy on 127.0.0.1:" .. port)
 
     local dap          = require("dap")
@@ -242,7 +262,7 @@ end
 function M.launch_last()
   local data = M.load_last_target()
   if not data or not data.target or data.target == "" then
-    print("No previous target found. Use <leader>dt or <leader>dp to select one first.")
+    print("No previous target found. Use <leader>gc/gp/gr/gd to select one first.")
     return
   end
   print(string.format("Relaunching last target (%s): %s", data.lang, data.target))
@@ -250,15 +270,19 @@ function M.launch_last()
     M.start_python(data.target)
   elseif data.lang == "rust" then
     M.start_rust(data.target)
+  elseif data.lang == "cpp_remote" or data.lang == "rust_remote" then
+    local base_lang = (data.lang == "rust_remote") and "rust" or "cpp"
+    require("dap_modules.remote").deploy_and_debug(base_lang, data.target, data.host)
   else
     M.start_cpp(data.target)
   end
 end
 
--- Internal: run one bazel query per rule kind and merge results into a single
--- Telescope picker. Using separate queries avoids Bazel's lack of regex
--- alternation support in kind() filters.
-local function pick_bazel_targets_multi(queries, prompt_title, on_select)
+-- Run one bazel query per rule kind and merge results into a single Telescope
+-- picker. Using separate queries avoids Bazel's lack of regex alternation
+-- support in kind() filters. Exported so dap_modules/remote.lua can offer the
+-- same target picker for remote deploys.
+function M.pick_targets(queries, prompt_title, on_select)
   local cfg = require("dap_modules.project").load()
   local all_targets = {}
   local remaining = #queries
@@ -329,15 +353,15 @@ end
 -- ── Telescope pickers ─────────────────────────────────────────────────────────
 
 function M.launch_test()
-  pick_bazel_targets_multi({ "cc_binary", "cc_test" }, "Select C++ Target", M.start_cpp)
+  M.pick_targets({ "cc_binary", "cc_test" }, "Select C++ Target", M.start_cpp)
 end
 
 function M.launch_python()
-  pick_bazel_targets_multi({ "py_binary", "py_test" }, "Select Python Target", M.start_python)
+  M.pick_targets({ "py_binary", "py_test" }, "Select Python Target", M.start_python)
 end
 
 function M.launch_rust()
-  pick_bazel_targets_multi({ "rust_binary", "rust_test" }, "Select Rust Target", M.start_rust)
+  M.pick_targets({ "rust_binary", "rust_test" }, "Select Rust Target", M.start_rust)
 end
 
 function M.launch_rust_simple()
@@ -346,52 +370,49 @@ function M.launch_rust_simple()
   end)
 end
 
--- ── SIL attach (FSW + SIM already running via tmux) ─────────────────────────
--- gdbserver is launched by sil_tmux.sh, not by nvim. Just attach to both ports.
+-- ── Dual-target attach (both gdbservers already running via tmux) ──────────
+-- gdbserver is launched by an external tmux script, not by nvim. Just attach
+-- to both ports.
 
-function M.connect_sil()
+function M.connect_dual()
   local dap       = require("dap")
   local workspace = vim.fn.getcwd()
   local cache     = vim.fn.expand("~/.cache/dev/bazel")
 
-  local setup = {
+  local setup = M.gdb_setup_commands(workspace, cache, {
     { text = "set $nvim_dap_setup_ran = 1", ignoreFailures = false },
-    { text = "-enable-pretty-printing",     ignoreFailures = false },
-    { text = _printer_cmd,                  ignoreFailures = true },
-    { text = "set print object on",         ignoreFailures = true },
-    { text = "directory " .. workspace,    ignoreFailures = false },
-    { text = "set debug-file-directory " .. cache, ignoreFailures = true },
-  }
+  })
 
-  local sim_config = {
-    name          = "SIM (SIL :1235)",
-    type          = "gdb_sil",
+  local second_config = {
+    name          = "Secondary (:1235)",
+    type          = "gdb_dual",
     request       = "attach",
     target        = "localhost:1235",
     cwd           = workspace,
     setupCommands = setup,
   }
 
-  -- event_stopped fires the moment FSW's gdb attaches and pauses the target.
-  -- This is the earliest reliable post-configurationDone signal: by the time
-  -- gdbserver sends "stopped", the full DAP handshake (initialize →
-  -- configurationDone) is complete. event_continued is wrong here because
-  -- FSW stays paused after attach (user hasn't resumed it), so it never fires.
-  -- The fallback timer guards against edge cases where event_stopped is missed.
-  local sim_started = false
-  local function start_sim()
-    if sim_started then return end
-    sim_started = true
-    dap.listeners.after.event_stopped["sil_connect_sim"] = nil
-    dap.run(sim_config)
+  -- event_stopped fires the moment the first target's gdb attaches and pauses
+  -- it. This is the earliest reliable post-configurationDone signal: by the
+  -- time gdbserver sends "stopped", the full DAP handshake (initialize →
+  -- configurationDone) is complete. event_continued is wrong here because the
+  -- first target stays paused after attach (user hasn't resumed it), so it
+  -- never fires. The fallback timer guards against edge cases where
+  -- event_stopped is missed.
+  local second_started = false
+  local function start_second()
+    if second_started then return end
+    second_started = true
+    dap.listeners.after.event_stopped["dual_connect_second"] = nil
+    dap.run(second_config)
   end
 
-  dap.listeners.after.event_stopped["sil_connect_sim"] = start_sim
-  vim.defer_fn(start_sim, 5000)
+  dap.listeners.after.event_stopped["dual_connect_second"] = start_second
+  vim.defer_fn(start_second, 5000)
 
   dap.run({
-    name          = "FSW (SIL :1234)",
-    type          = "gdb_sil",
+    name          = "Primary (:1234)",
+    type          = "gdb_dual",
     request       = "attach",
     target        = "localhost:1234",
     cwd           = workspace,
@@ -422,7 +443,7 @@ function M.start_rust(target)
   local cmd  = M.build_command(cfg.rust.bazel_config, target, cfg.rust.container_name, cfg.rust.bazel_bin)
 
   print(string.format("Starting gdbserver for Rust: %s (port %d)", target, port))
-  M.gdbserver_job_id = start_job(cmd, "Listening on port " .. port, "gdbserver", function()
+  M.gdbserver_job_id = M.start_job(cmd, "Listening on port " .. port, "gdbserver", function()
     require("dap").continue()
   end)
 end

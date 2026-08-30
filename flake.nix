@@ -148,6 +148,36 @@
             +qa
           touch "$out"
         '';
+
+        # Runs dotfiles/nvim/lua/dap_modules' own plenary test suite and
+        # renders its line-coverage HTML report (see
+        # dotfiles/nvim/lua/dap_modules/README.md's "Testing" section) as a
+        # hermetic, sandboxed build — no lazy.nvim install or network access
+        # needed, since the handful of plugins that suite requires
+        # (plenary/nvim-dap/nvim-dap-view/telescope/telescope-dap) come from
+        # nixpkgs' vimPlugins instead. `nix build
+        # .#checks.x86_64-linux.dap-modules-coverage -o out/dap-modules-coverage`
+        # then puts the report at out/dap-modules-coverage/index.html.
+        # Fails the build (and so `nix flake check`) if any test fails,
+        # same as the two compiler-explorer checks above.
+        dap-modules-coverage = pkgs.runCommand "dap-modules-coverage" {
+          nativeBuildInputs = [ pkgs.neovim ];
+        } ''
+          export HOME="$TMPDIR"
+          export DAP_MODULES_TEST_PLUGIN_PATHS="${pkgs.vimPlugins.plenary-nvim}:${pkgs.vimPlugins.nvim-dap}:${pkgs.vimPlugins.nvim-dap-view}:${pkgs.vimPlugins.telescope-nvim}:${pkgs.vimPlugins.telescope-dap-nvim}"
+
+          tests_dir="${./dotfiles/nvim}/lua/dap_modules/tests"
+          data_dir="$TMPDIR/coverage-data"
+          mkdir -p "$data_dir" "$out"
+
+          export DAP_MODULES_COVERAGE_DIR="$data_dir"
+          nvim --headless --noplugin -u "$tests_dir/minimal_init.lua" \
+            -c "PlenaryBustedDirectory $tests_dir { minimal_init = '$tests_dir/minimal_init.lua' }"
+
+          nvim -l "$tests_dir/render_coverage.lua" \
+            "$data_dir" "$out/index.html" \
+            "${./dotfiles/nvim}/lua/dap_modules" "${./dotfiles/nvim}/lua/bazel_picker.lua"
+        '';
       };
     };
 }

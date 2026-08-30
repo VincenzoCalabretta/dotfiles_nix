@@ -1,0 +1,16 @@
+"""Minimal reference workspace for dap_modules (see ../../README.md).
+
+Version pins deliberately match what a `rules_cc`/`rules_python` bzlmod
+setup on Bazel 9.x looks like in practice, so a `.nvim-dap.lua` written
+against this project's config names generalizes to a real monorepo built
+the same way -- see this directory's README.md "Compatibility" section.
+"""
+
+module(name = "dap_modules_reference_project", version = "0.0.0")
+
+bazel_dep(name = "rules_cc", version = "0.2.22")
+bazel_dep(name = "rules_python", version = "2.2.0")
+
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(python_version = "3.11")
+use_repo(python, "python_3_11")
