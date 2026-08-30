@@ -168,7 +168,7 @@ local mappings = {
 	{ key = "<leader>gti", desc = "Show tracepoint information in the REPL", category = "DAP" },
 	{ key = "<leader>gv", desc = "Open the DAP variable and stack view", category = "DAP" },
 	{ key = "<leader>gV", desc = "Close the DAP variable and stack view", category = "DAP" },
-	{ key = "<leader>gs", desc = "Connect DAP to SIL flight software and simulator", category = "DAP" },
+	{ key = "<leader>gs", desc = "Connect DAP to dual gdbservers (:1234 + :1235)", category = "DAP" },
 	{ key = "<leader>gc", desc = "Debug a C++ Bazel target", category = "DAP" },
 	{ key = "<leader>gl", desc = "Relaunch the most recent DAP target", category = "DAP" },
 	{ key = "<leader>gp", desc = "Debug a Python Bazel target", category = "DAP" },
@@ -241,6 +241,11 @@ if compiler_explorer_enabled then
 	table.insert(mappings, {
 		key = "<leader>ce",
 		desc = "Compile the current buffer or selection in Compiler Explorer",
+		category = "Compiler Explorer",
+	})
+	table.insert(mappings, {
+		key = "K",
+		desc = "Show assembly instruction/register docs (asm buffers)",
 		category = "Compiler Explorer",
 	})
 end
