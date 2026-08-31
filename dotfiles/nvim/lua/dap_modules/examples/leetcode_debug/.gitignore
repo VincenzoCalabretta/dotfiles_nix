@@ -1,0 +1,11 @@
+/bazel-*
+
+# If $LEETCODE_STORAGE_HOME points directly at this checkout (rather than a
+# copy elsewhere), leetcode.nvim/harness.lua write real per-problem files
+# here. This repo is a generic module library -- personal solve progress
+# doesn't belong in it. Real LeetCode frontend ids start at 1; the tracked
+# demo deliberately uses id 0 (see README.md), so this pattern only ever
+# ignores real solves, never the demo. BUILD.bazel is NOT ignored: real
+# usage still edits it, but as a visible diff you'd have to consciously
+# `git add`, not a silently-untracked file.
+/solutions/[1-9]*

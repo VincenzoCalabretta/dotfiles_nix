@@ -1,0 +1,12 @@
+"""LeetCode debug workspace (see README.md).
+
+leetcode.nvim writes each problem's solution file into solutions/ (via
+$LEETCODE_STORAGE_HOME, set in home/v.nix) as
+<frontend_id>.<title_slug>.cpp. solutions/BUILD.bazel pairs each one with a
+hand-written or generated *_harness.cc so dap_modules' bazel_picker
+(<leader>bd) can build and gdbserver-debug it directly.
+"""
+
+module(name = "leetcode_debug", version = "0.0.0")
+
+bazel_dep(name = "rules_cc", version = "0.2.22")

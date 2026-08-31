@@ -1,0 +1,8 @@
+# Matches dap_modules' built-in defaults (project.lua) exactly, so no
+# .nvim-dap.lua would even be strictly required — see the public repo's
+# dap_modules/examples/reference-project/.bazelrc, which this copies.
+
+build:gdbnf --compilation_mode=dbg
+build:gdbnf --copt=-fno-omit-frame-pointer
+build:gdbnf --strip=never
+run:gdbnf --run_under="gdbserver :1234"

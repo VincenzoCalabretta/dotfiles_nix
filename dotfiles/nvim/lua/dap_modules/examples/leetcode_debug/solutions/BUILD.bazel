@@ -1,0 +1,28 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+
+# Demo pairing, proving the storage.home -> Bazel -> dap_modules wiring end
+# to end before leetcode_modules/harness.lua (Phase 2) generates these
+# automatically for whatever real problem is open. Delete once Phase 2
+# lands.
+#
+# The solution needs its own cc_library: cc_binary has neither a `hdrs`
+# nor a `textual_hdrs` attribute (both verified against a real Bazel 9.1.0
+# build), only cc_library does. Without it, the harness's
+# #include "0.demo-two-sum.cpp" fails sandboxed with "No such file or
+# directory" — plain `srcs` siblings are each compiled as independent
+# actions that can't see each other's source. No ODR risk from compiling
+# the header-like .cpp file into two translation units (the library's own,
+# and the harness's via #include): its methods are implicitly `inline`,
+# being defined inside the class body.
+cc_library(
+    name = "demo_two_sum_solution",
+    hdrs = ["0.demo-two-sum.cpp"],
+)
+
+cc_binary(
+    name = "demo_two_sum_debug",
+    srcs = ["0.demo-two-sum_harness.cc"],
+    deps = [":demo_two_sum_solution"],
+    copts = ["-fno-omit-frame-pointer"],
+    visibility = ["//visibility:public"],
+)

@@ -107,6 +107,14 @@ first. See [its README](examples/reference-project/README.md) for how to
 run it and what was (and wasn't) actually verified when it was authored, and
 for notes on why its config names generalize to real monorepos.
 
+`examples/leetcode_debug/` is a second, more specific example: a Bazel
+workspace wired to `plugins/leetcode.lua`'s `:LeetDebugPrep`, so
+leetcode.nvim solutions can be debugged through this same `gdbnf` flow
+instead of only leetcode.nvim's own run/submit console. Ships its own
+`flake.nix` devShell (Bazel via `bazelisk`, `gcc`, `gdb`) rather than
+relying on this repo's own toolchain. See
+[its README](examples/leetcode_debug/README.md).
+
 ---
 
 ## Per-project configuration: `.nvim-dap.lua`
