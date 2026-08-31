@@ -1,0 +1,289 @@
+-- Phase 2 of the leetcode.nvim <-> dap_modules debug integration (see
+-- tools/leetcode_debug/README.md in the private overlay repo for Phase 1).
+--
+-- :LeetDebugPrep reads the currently open question's meta_data (param
+-- names/types, method name) and the first test case from its testcase
+-- popup buffer, then generates a small C++ harness + a paired
+-- cc_library/cc_binary in BUILD.bazel next to the solution file, so
+-- dap_modules' bazel_picker (<leader>bd) can build and gdbserver-debug it
+-- directly. Only scalar/array/string param and return types are
+-- supported; ListNode/TreeNode-shaped problems are refused with a clear
+-- error rather than generating something that won't compile.
+local M = {}
+
+local function passthrough(s)
+  return s
+end
+
+local function brackets_to_braces(s)
+  return (s:gsub("%[", "{"):gsub("%]", "}"))
+end
+
+-- Keyed by LeetCode's own meta_data type strings (see
+-- lua/leetcode/api/types.lua's metadata_param/metadata_return in the
+-- leetcode.nvim source). LeetCode's bracket-notation test-case text is
+-- already valid C++ once brackets become braces, so no runtime parsing is
+-- needed -- values are baked into the generated source as literals.
+local TYPE_MAP = {
+  integer = { cpp = "int", transform = passthrough },
+  ["integer[]"] = { cpp = "std::vector<int>", transform = brackets_to_braces },
+  ["integer[][]"] = { cpp = "std::vector<std::vector<int>>", transform = brackets_to_braces },
+  long = { cpp = "long long", transform = passthrough },
+  ["long[]"] = { cpp = "std::vector<long long>", transform = brackets_to_braces },
+  double = { cpp = "double", transform = passthrough },
+  number = { cpp = "double", transform = passthrough },
+  boolean = { cpp = "bool", transform = passthrough },
+  string = { cpp = "std::string", transform = passthrough },
+  ["string[]"] = { cpp = "std::vector<std::string>", transform = brackets_to_braces },
+  character = { cpp = "char", transform = passthrough },
+}
+
+-- Overloaded on the Solution method's actual return type, so the harness
+-- just calls print_result(result) and C++ overload resolution picks the
+-- matching formatter. A return type outside this set fails at compile
+-- time with "no matching function" -- acceptable for the unsupported
+-- (ListNode/TreeNode/...) case, though M.prep() already refuses those
+-- earlier with a clearer Lua-side error.
+local PRINT_HELPERS = [[
+inline void print_result(int v) { std::printf("%d\n", v); }
+inline void print_result(long long v) { std::printf("%lld\n", v); }
+inline void print_result(double v) { std::printf("%g\n", v); }
+inline void print_result(bool v) { std::printf("%s\n", v ? "true" : "false"); }
+inline void print_result(char v) { std::printf("\"%c\"\n", v); }
+inline void print_result(const std::string& v) { std::printf("\"%s\"\n", v.c_str()); }
+inline void print_result(const std::vector<int>& v) {
+  std::printf("[");
+  for (size_t i = 0; i < v.size(); ++i) std::printf("%s%d", i ? "," : "", v[i]);
+  std::printf("]\n");
+}
+inline void print_result(const std::vector<long long>& v) {
+  std::printf("[");
+  for (size_t i = 0; i < v.size(); ++i) std::printf("%s%lld", i ? "," : "", v[i]);
+  std::printf("]\n");
+}
+inline void print_result(const std::vector<double>& v) {
+  std::printf("[");
+  for (size_t i = 0; i < v.size(); ++i) std::printf("%s%g", i ? "," : "", v[i]);
+  std::printf("]\n");
+}
+inline void print_result(const std::vector<std::string>& v) {
+  std::printf("[");
+  for (size_t i = 0; i < v.size(); ++i) std::printf("%s\"%s\"", i ? "," : "", v[i].c_str());
+  std::printf("]\n");
+}
+inline void print_result(const std::vector<std::vector<int>>& v) {
+  std::printf("[");
+  for (size_t i = 0; i < v.size(); ++i) {
+    std::printf("%s[", i ? "," : "");
+    for (size_t j = 0; j < v[i].size(); ++j) std::printf("%s%d", j ? "," : "", v[i][j]);
+    std::printf("]");
+  }
+  std::printf("]\n");
+}]]
+
+local CPP_KEYWORDS = {
+  ["new"] = true,
+  ["class"] = true,
+  ["delete"] = true,
+  ["template"] = true,
+  ["namespace"] = true,
+  ["operator"] = true,
+  ["public"] = true,
+  ["private"] = true,
+  ["protected"] = true,
+  ["friend"] = true,
+  ["union"] = true,
+  ["typename"] = true,
+  ["this"] = true,
+  ["true"] = true,
+  ["false"] = true,
+}
+
+local function sanitize_ident(name)
+  name = (name or ""):gsub("[^%w_]", "_")
+  if name == "" then
+    name = "arg"
+  elseif name:match("^%d") then
+    name = "_" .. name
+  end
+  if CPP_KEYWORDS[name] then
+    name = name .. "_"
+  end
+  return name
+end
+
+local function read_file(path)
+  local f = io.open(path, "r")
+  if not f then
+    return nil
+  end
+  local content = f:read("*a")
+  f:close()
+  return content
+end
+
+local function write_file(path, content)
+  local f = assert(io.open(path, "w"))
+  f:write(content)
+  f:close()
+end
+
+local BUILD_HEADER = 'load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")\n'
+
+local function build_block(lib_name, bin_name, sol_basename, harness_basename)
+  return ([[
+
+# Generated by leetcode_modules/harness.lua (:LeetDebugPrep). The solution
+# needs its own cc_library: cc_binary has neither `hdrs` nor `textual_hdrs`
+# (verified against a real Bazel 9.1.0 build -- see
+# tools/leetcode_debug/README.md), only cc_library does.
+cc_library(
+    name = "%s",
+    hdrs = ["%s"],
+)
+
+cc_binary(
+    name = "%s",
+    srcs = ["%s"],
+    deps = [":%s"],
+    copts = ["-fno-omit-frame-pointer"],
+    visibility = ["//visibility:public"],
+)
+]]):format(lib_name, sol_basename, bin_name, harness_basename, lib_name)
+end
+
+---Read the first test case (one value per line, in meta_data.params
+---order) out of the currently open question's testcase popup buffer.
+---@param question lc.ui.Question
+---@param nparams integer
+---@return string[]|nil
+local function read_first_testcase(question, nparams)
+  local testcase = question.console and question.console.testcase
+  local bufnr = testcase and testcase.bufnr
+  if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
+    return nil
+  end
+
+  local lines = {}
+  for _, line in ipairs(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)) do
+    if line == "" then
+      break
+    end
+    table.insert(lines, line)
+  end
+
+  if #lines < nparams then
+    return nil
+  end
+  return lines
+end
+
+function M.prep()
+  local ok, utils = pcall(require, "leetcode.utils")
+  if not ok then
+    vim.notify("leetcode_debug: leetcode.nvim isn't loaded", vim.log.levels.ERROR)
+    return
+  end
+
+  local question = utils.curr_question()
+  if not question then
+    vim.notify("leetcode_debug: no LeetCode question is open in this tab", vim.log.levels.ERROR)
+    return
+  end
+
+  local meta = question.q.meta_data
+  if not meta or not meta.params or not meta["return"] then
+    vim.notify("leetcode_debug: this question has no usable meta_data.params/return", vim.log.levels.ERROR)
+    return
+  end
+
+  for _, param in ipairs(meta.params) do
+    if not TYPE_MAP[param.type] then
+      vim.notify(
+        ('leetcode_debug: unsupported param type "%s" (%s) -- not implemented yet'):format(param.type, param.name),
+        vim.log.levels.ERROR
+      )
+      return
+    end
+  end
+
+  local ret_type = meta["return"].type
+  if not TYPE_MAP[ret_type] then
+    vim.notify(
+      ('leetcode_debug: unsupported return type "%s" -- not implemented yet'):format(tostring(ret_type)),
+      vim.log.levels.ERROR
+    )
+    return
+  end
+
+  local case = read_first_testcase(question, #meta.params)
+  if not case then
+    vim.notify("leetcode_debug: couldn't read a full test case from the testcase popup", vim.log.levels.ERROR)
+    return
+  end
+
+  local decl_lines, arg_names = {}, {}
+  for i, param in ipairs(meta.params) do
+    local mapped = TYPE_MAP[param.type]
+    local ident = sanitize_ident(param.name)
+    table.insert(decl_lines, ("  %s %s = %s;"):format(mapped.cpp, ident, mapped.transform(case[i])))
+    table.insert(arg_names, ident)
+  end
+
+  local sol_path = question.file:absolute()
+  local sol_basename = vim.fs.basename(sol_path)
+  local dir = vim.fs.dirname(sol_path)
+
+  local frontend_id = question.q.frontend_id
+  local title_slug = question.q.title_slug
+  local safe_slug = (title_slug:gsub("-", "_"))
+
+  local harness_basename = ("%s.%s_harness.cc"):format(frontend_id, title_slug)
+  local harness_path = dir .. "/" .. harness_basename
+  local call = ("Solution().%s(%s)"):format(meta.name, table.concat(arg_names, ", "))
+
+  local harness_content = ([[
+// Generated by leetcode_modules/harness.lua (:LeetDebugPrep) -- overwritten
+// each time you re-run it against a (possibly edited) test case.
+#include <cstdio>
+#include <string>
+#include <vector>
+#include "%s"
+
+namespace leetcode_debug_harness {
+%s
+}  // namespace leetcode_debug_harness
+
+int main() {
+%s
+  auto result = %s;
+  leetcode_debug_harness::print_result(result);
+}
+]]):format(sol_basename, PRINT_HELPERS, table.concat(decl_lines, "\n"), call)
+
+  write_file(harness_path, harness_content)
+
+  local lib_name = safe_slug .. "_solution"
+  local bin_name = safe_slug .. "_debug"
+  local build_path = dir .. "/BUILD.bazel"
+  local existing = read_file(build_path)
+  local pkg = vim.fs.basename(dir)
+
+  if existing and existing:find('name = "' .. bin_name .. '"', 1, true) then
+    vim.notify(("leetcode_debug: harness refreshed; //%s:%s already in BUILD.bazel"):format(pkg, bin_name))
+    return
+  end
+
+  local block = build_block(lib_name, bin_name, sol_basename, harness_basename)
+  if not existing then
+    write_file(build_path, BUILD_HEADER .. block)
+  else
+    local f = assert(io.open(build_path, "a"))
+    f:write(block)
+    f:close()
+  end
+
+  vim.notify(("leetcode_debug: generated //%s:%s -- pick it in <leader>bd"):format(pkg, bin_name))
+end
+
+return M
