@@ -3,7 +3,9 @@
 return {
   {
     "kawre/leetcode.nvim",
-    build = ":TSUpdate html",
+    -- html parser is fetched on demand via treesitter.lua's auto_install,
+    -- since nvim-treesitter's main branch doesn't support lazy-loading and
+    -- ":TSUpdate" isn't defined yet when this plugin's build step would run.
     cmd = "Leet",
     dependencies = {
       "nvim-telescope/telescope.nvim",
