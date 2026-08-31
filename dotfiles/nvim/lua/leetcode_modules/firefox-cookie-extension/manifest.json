@@ -1,0 +1,18 @@
+{
+  "manifest_version": 2,
+  "name": "LeetCode Cookie Copier",
+  "version": "1.0.0",
+  "description": "Copies your csrftoken + LEETCODE_SESSION cookies to the clipboard, formatted for leetcode.nvim's :Leet cookie update prompt.",
+  "permissions": [
+    "cookies",
+    "clipboardWrite",
+    "*://leetcode.com/*",
+    "*://leetcode.cn/*"
+  ],
+  "browser_action": {
+    "default_title": "Copy LeetCode cookie"
+  },
+  "background": {
+    "scripts": ["background.js"]
+  }
+}
