@@ -1,5 +1,26 @@
 -- Solve LeetCode problems inside Neovim.
---   :Leet    open the LeetCode dashboard
+--   First-time setup: log into leetcode.com in a browser, grab the
+--   `csrftoken` + `LEETCODE_SESSION` cookies (devtools > Application/
+--   Storage > Cookies), then run `:Leet cookie update` and paste
+--   "csrftoken=<value>; LEETCODE_SESSION=<value>". Repeat whenever
+--   `:Leet` starts failing with an auth error (session expired).
+--
+--   :Leet              open the dashboard (random/daily/problem list)
+--   :Leet daily        open today's problem
+--   :Leet run          run against the sample/custom test cases only
+--   :Leet test         same as `:Leet run` (alias)
+--   :Leet submit       submit for real grading against LeetCode
+--   :Leet console      open the run/submit console pop-up manually
+--   :Leet lang         change the language for the current question
+--   :Leet reset        reset the code section to the default snippet
+--
+-- Set $LEETCODE_STORAGE_HOME (e.g. via home.sessionVariables in a consuming
+-- flake, matching the COMPILER_EXPLORER_URL pattern in modules/nvim.nix) to
+-- point solution files at a Bazel workspace instead of the default
+-- stdpath("data")/leetcode, so a debug harness there can build/gdbserver
+-- the exact file this plugin writes. Left unset, the default applies.
+local storage_home = vim.env.LEETCODE_STORAGE_HOME
+
 return {
   {
     "kawre/leetcode.nvim",
@@ -16,6 +37,7 @@ return {
     },
     opts = {
       lang = "cpp",
+      storage = storage_home and { home = storage_home } or nil,
     },
   },
 }
