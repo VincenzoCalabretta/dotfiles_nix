@@ -22,6 +22,7 @@ function M.setup(bazel)
   vim.fn.sign_define("DapBreakpointRejected",  { text = "○", texthl = "DiagnosticInfo"                        })
   vim.fn.sign_define("DapStopped",             { text = "→", texthl = "DiagnosticWarn", linehl = "CursorLine" })
   vim.fn.sign_define("DapLogPoint",            { text = "◎", texthl = "DiagnosticInfo"                        })
+  vim.fn.sign_define("DapTracepoint",          { text = "◉", texthl = "DiagnosticHint"                        })
 
   -- ── Adapters ───────────────────────────────────────────────────────────────
 
@@ -200,9 +201,19 @@ function M.setup(bazel)
   })
 
   -- ── Tracepoint timeline ────────────────────────────────────────────────────
-  -- Non-stopping execution trace: set tracepoints, tstart, let the system run,
-  -- then DapTraceShow to collect all frames into a timestamped timeline buffer.
+  -- Non-stopping execution trace: set tracepoints, tstart, resume, pause, then
+  -- DapTraceShow to stop collection and render a timestamped timeline buffer.
   local trace = require("dap_modules.trace")
+
+  -- Tracepoints are issued as raw GDB CLI commands, so nvim-dap does not own
+  -- their UI state. trace.lua maintains its own signs; remove signs for only
+  -- the session that ended (important when dual gdbserver sessions are used).
+  dap.listeners.before.event_terminated["tracepoint_sign_cleanup"] = function(session)
+    trace.clear_markers(session)
+  end
+  dap.listeners.before.event_exited["tracepoint_sign_cleanup"] = function(session)
+    trace.clear_markers(session)
+  end
 
   vim.api.nvim_create_user_command("DapTraceSet", function(o)
     trace.set(o.args ~= "" and o.args or nil)
@@ -226,7 +237,7 @@ function M.setup(bazel)
 
   vim.api.nvim_create_user_command("DapTraceShow", function()
     trace.show()
-  end, { desc = "Stop collection and display the execution timeline" })
+  end, { desc = "Show trace timeline (pause target first)" })
 
   -- ── Remote SSH deploy + debug ──────────────────────────────────────────────
   -- <leader>gd is the C++ shortcut (see plugins/dap.lua); this command covers

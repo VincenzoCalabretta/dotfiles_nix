@@ -104,7 +104,8 @@ local core = {
     },
 
     -- ── Tracepoint timeline: <leader>gt prefix ───────────────────────────────
-    -- Workflow: gtt (set) → gts (start) → let system run → gtv (show timeline)
+    -- Workflow: gtt (set) → gts (start collection) → <M-c> (run) →
+    -- <M-p> (pause) → gtv (stop collection + show timeline).
     {
       "<leader>gtt",
       function() require("dap_modules.trace").set() end,
@@ -127,7 +128,7 @@ local core = {
     {
       "<leader>gtv",
       function() require("dap_modules.trace").show() end,
-      desc = "Trace: stop + show timeline",
+      desc = "Trace: show timeline (pause target first)",
     },
     {
       "<leader>gtc",

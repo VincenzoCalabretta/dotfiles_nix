@@ -98,4 +98,134 @@ describe("dap_modules.trace", function()
       end)
     end
   end)
+
+  describe("running-target guard clause", function()
+    local orig_session
+
+    before_each(function()
+      orig_session = dap.session
+      dap.session = function()
+        return {
+          -- A running session has no stopped thread. Its request method must
+          -- not be reached: GDB rejects tstop/tfind while the inferior runs.
+          stopped_thread_id = nil,
+          request = function() error("GDB request must not run while target is running") end,
+        }
+      end
+    end)
+
+    after_each(function()
+      dap.session = orig_session
+    end)
+
+    for _, case in ipairs({
+      { name = "tstop", fn = trace.tstop },
+      { name = "show",  fn = trace.show },
+    }) do
+      it(case.name .. "() asks for a pause without issuing a GDB request", function()
+        local notified = {}
+        local orig_notify = vim.notify
+        vim.notify = function(msg, level) table.insert(notified, { msg = msg, level = level }) end
+
+        local ok = pcall(case.fn)
+
+        vim.notify = orig_notify
+        assert.is_true(ok, case.name .. "() must not raise while the target runs")
+        assert.equals(vim.log.levels.WARN, notified[1].level)
+        assert.matches("Pause the target", notified[1].msg)
+      end)
+    end
+  end)
+
+  describe("tracepoint markers", function()
+    local orig_session
+    local session
+    local buf
+    local trace_scripts
+
+    before_each(function()
+      vim.fn.sign_define("DapTracepoint", { text = "◉" })
+      trace_scripts = {}
+      session = {
+        id = 4242,
+        request = function(_, command, args, cb)
+          assert.equals("evaluate", command)
+          local script = args.expression:match("^source%s+(.+)$")
+          if script then
+            table.insert(trace_scripts, { path = script, lines = vim.fn.readfile(script) })
+          end
+          cb(nil, { result = "" })
+        end,
+      }
+      orig_session = dap.session
+      dap.session = function() return session end
+
+      buf = vim.api.nvim_create_buf(false, true)
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "trace_tick();" })
+      vim.api.nvim_set_current_buf(buf)
+      vim.api.nvim_win_set_cursor(0, { 1, 1 })
+    end)
+
+    after_each(function()
+      trace.clear_markers(session)
+      if vim.api.nvim_buf_is_valid(buf) then vim.api.nvim_buf_delete(buf, { force = true }) end
+      dap.session = orig_session
+    end)
+
+    it("places one sign at the cursor and removes it after clear", function()
+      trace.set()
+      trace.set() -- Repeating a tracepoint must not stack duplicate signs.
+
+      assert.equals(2, #trace_scripts)
+      assert.same({
+        "trace trace_tick",
+        "actions",
+        "collect $trace_timestamp",
+        "end",
+      }, trace_scripts[1].lines)
+      assert.equals(0, vim.fn.filereadable(trace_scripts[1].path))
+
+      local placed = vim.fn.sign_getplaced(buf, { group = "DapTracepoints-4242" })
+      assert.equals(1, #placed[1].signs)
+      assert.equals("DapTracepoint", placed[1].signs[1].name)
+      assert.equals(1, placed[1].signs[1].lnum)
+
+      trace.clear()
+      placed = vim.fn.sign_getplaced(buf, { group = "DapTracepoints-4242" })
+      assert.equals(0, #placed[1].signs)
+    end)
+  end)
+
+  describe("tracepoint info", function()
+    local orig_session
+    local repl
+    local orig_open
+    local orig_execute
+
+    before_each(function()
+      orig_session = dap.session
+      dap.session = function() return { id = 7 } end
+      repl = require("dap").repl
+      orig_open = repl.open
+      orig_execute = repl.execute
+    end)
+
+    after_each(function()
+      dap.session = orig_session
+      repl.open = orig_open
+      repl.execute = orig_execute
+    end)
+
+    it("executes info tracepoints through the REPL so its result is rendered", function()
+      local opened = false
+      local command
+      repl.open = function() opened = true end
+      repl.execute = function(text) command = text end
+
+      trace.info()
+
+      assert.is_true(opened)
+      assert.equals("info tracepoints", command)
+    end)
+  end)
 end)

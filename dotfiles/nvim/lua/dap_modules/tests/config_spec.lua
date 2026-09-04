@@ -65,7 +65,7 @@ describe("dap_modules.config", function()
     it("defines every DAP sign group", function()
       for _, name in ipairs({
         "DapBreakpoint", "DapBreakpointCondition", "DapBreakpointRejected",
-        "DapStopped", "DapLogPoint",
+        "DapStopped", "DapLogPoint", "DapTracepoint",
       }) do
         assert.equals(1, #vim.fn.sign_getdefined(name), name .. " should be defined")
       end
@@ -92,6 +92,8 @@ describe("dap_modules.config", function()
       assert.is_function(dap.listeners.before.event_terminated["dap_auto_hover_cleanup"])
       assert.is_function(dap.listeners.after.event_terminated["kill_gdbserver"])
       assert.is_function(dap.listeners.after.event_exited["kill_gdbserver"])
+      assert.is_function(dap.listeners.before.event_terminated["tracepoint_sign_cleanup"])
+      assert.is_function(dap.listeners.before.event_exited["tracepoint_sign_cleanup"])
     end)
   end)
 end)

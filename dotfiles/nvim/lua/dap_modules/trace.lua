@@ -8,18 +8,101 @@
 -- Workflow:
 --   1. Session connected and paused (after <leader>gs)
 --   2. <leader>gtt  — place tracepoint on function under cursor
---   3. <leader>gts  — tstart; the target resumes and logs hits non-intrusively
---   4. <leader>gtv  — tstop + collect all frames → timeline buffer
+--   3. <leader>gts  — tstart, then <M-c> to resume and log hits non-intrusively
+--   4. <M-p>        — pause the target (GDB requires this before tstop/tfind)
+--   5. <leader>gtv  — tstop + collect all frames → timeline buffer
 --
--- Timestamps come from $trace_timestamp (hardware trace unit).
--- If unavailable the timeline shows sequence order only.
+-- Every tracepoint collects the target's $trace_timestamp trace-state
+-- variable. GNU gdbserver supplies it in microseconds; an unsupported target
+-- still leaves it unavailable and the timeline falls back to sequence order.
 
 local M = {}
 
 M._buf = nil
 M._win = nil
 
+local TRACE_SIGN_NAME = "DapTracepoint"
+local TRACE_SIGN_GROUP_PREFIX = "DapTracepoints-"
+-- group → buffer → line → sign id. This both prevents duplicate markers when
+-- a tracepoint is set twice and lets a dual-session cleanup remove only its
+-- own signs.
+M._markers = {}
+
 local MAX_FRAMES = 500
+
+local function sign_group(session)
+  return TRACE_SIGN_GROUP_PREFIX .. tostring(session.id or "active")
+end
+
+local function marker_at_cursor()
+  return {
+    bufnr = vim.api.nvim_get_current_buf(),
+    lnum  = vim.api.nvim_win_get_cursor(0)[1],
+  }
+end
+
+-- A prompted file:line tracepoint can be marked too. Function locations are
+-- resolved by GDB, so only the cursor form can be marked reliably before the
+-- command response returns.
+local function marker_from_location(location)
+  local file, line = location:match("^(.-):(%d+)$")
+  if not file or vim.fn.filereadable(file) == 0 then return nil end
+
+  local bufnr = vim.fn.bufadd(vim.fn.fnamemodify(file, ":p"))
+  vim.fn.bufload(bufnr)
+  return { bufnr = bufnr, lnum = tonumber(line) }
+end
+
+-- `actions` is an interactive, multi-line GDB command. DAP evaluate/repl
+-- executes one command string at a time, so neither the nvim-dap REPL nor a
+-- sequence of evaluate calls can feed its `collect`/`end` lines. Source a
+-- short, private command file instead; GDB executes the full tracepoint
+-- definition and action list as one CLI operation.
+local function write_trace_script(location)
+  local path = vim.fn.tempname() .. ".gdb"
+  local ok, result = pcall(vim.fn.writefile, {
+    "trace " .. location,
+    "actions",
+    "collect $trace_timestamp",
+    "end",
+  }, path)
+  if not ok or result ~= 0 then
+    pcall(vim.fn.delete, path)
+    return nil
+  end
+  return path
+end
+
+local function place_marker(session, marker)
+  if not marker or not vim.api.nvim_buf_is_valid(marker.bufnr) then return end
+
+  local group = sign_group(session)
+  local buffers = M._markers[group] or {}
+  local lines = buffers[marker.bufnr] or {}
+  if lines[marker.lnum] then return end
+
+  local id = vim.fn.sign_place(0, group, TRACE_SIGN_NAME, marker.bufnr, {
+    lnum = marker.lnum,
+    priority = 10,
+  })
+  lines[marker.lnum] = id
+  buffers[marker.bufnr] = lines
+  M._markers[group] = buffers
+end
+
+function M.clear_markers(session)
+  if session then
+    local group = sign_group(session)
+    vim.fn.sign_unplace(group)
+    M._markers[group] = nil
+    return
+  end
+
+  for group in pairs(M._markers) do
+    vim.fn.sign_unplace(group)
+  end
+  M._markers = {}
+end
 
 -- ── GDB helpers ───────────────────────────────────────────────────────────────
 
@@ -68,18 +151,32 @@ function M.set(location)
   local session = require("dap").session()
   if not session then vim.notify("No active DAP session", vim.log.levels.WARN); return end
 
+  local marker = location and marker_from_location(location) or marker_at_cursor()
   location = location or vim.fn.expand("<cword>")
   if location == "" then
     vim.notify("[Trace] No location — move cursor onto a function name or pass one explicitly",
                vim.log.levels.WARN)
     return
   end
+  if location:find("[\r\n]") then
+    vim.notify("[Trace] Tracepoint location must be a single line", vim.log.levels.WARN)
+    return
+  end
 
-  gdb(session, "trace " .. location, function(err)
+  local script = write_trace_script(location)
+  if not script then
+    vim.notify("[Trace] Could not create temporary GDB command file", vim.log.levels.ERROR)
+    return
+  end
+
+  gdb(session, "source " .. script, function(err)
+    pcall(vim.fn.delete, script)
     if err then
       vim.notify("[Trace] Failed: " .. (err.message or vim.inspect(err)), vim.log.levels.ERROR)
     else
-      vim.notify("[Trace] Tracepoint set: " .. location .. "  →  <leader>gts to start collection",
+      place_marker(session, marker)
+      vim.notify("[Trace] Tracepoint set: " .. location
+                 .. " (timestamp collection enabled)  →  <leader>gts to start collection",
                  vim.log.levels.INFO)
     end
   end)
@@ -92,7 +189,8 @@ function M.tstart()
     if err then
       vim.notify("[Trace] tstart failed: " .. (err.message or vim.inspect(err)), vim.log.levels.ERROR)
     else
-      vim.notify("[Trace] Collection started  →  <leader>gtv when done", vim.log.levels.INFO)
+      vim.notify("[Trace] Collection started  →  <M-c> to run; <M-p>, then <leader>gtv to view",
+                 vim.log.levels.INFO)
     end
   end)
 end
@@ -100,6 +198,10 @@ end
 function M.tstop()
   local session = require("dap").session()
   if not session then vim.notify("No active DAP session", vim.log.levels.WARN); return end
+  if not session.stopped_thread_id then
+    vim.notify("[Trace] Pause the target (<M-p>) before stopping collection", vim.log.levels.WARN)
+    return
+  end
   gdb(session, "tstop", function()
     vim.notify("[Trace] Stopped  →  <leader>gtv to view", vim.log.levels.INFO)
   end)
@@ -108,17 +210,25 @@ end
 function M.clear()
   local session = require("dap").session()
   if not session then vim.notify("No active DAP session", vim.log.levels.WARN); return end
-  gdb(session, "delete tracepoints", function()
-    vim.notify("[Trace] All tracepoints deleted", vim.log.levels.INFO)
+  gdb(session, "delete tracepoints", function(err)
+    if err then
+      vim.notify("[Trace] Failed to delete tracepoints: " .. (err.message or vim.inspect(err)),
+                 vim.log.levels.ERROR)
+    else
+      M.clear_markers(session)
+      vim.notify("[Trace] All tracepoints deleted", vim.log.levels.INFO)
+    end
   end)
 end
 
--- Show tracepoint status; output appears in the GDB REPL (opens it).
+-- Show tracepoint status in the nvim-dap REPL. Calling session:request()
+-- directly would receive the text but discard it, leaving only an empty REPL.
 function M.info()
   local session = require("dap").session()
   if not session then vim.notify("No active DAP session", vim.log.levels.WARN); return end
-  gdb(session, "info tracepoints", function() end)
-  require("dap").repl.open()
+  local repl = require("dap").repl
+  repl.open()
+  repl.execute("info tracepoints")
 end
 
 -- ── Frame collection ──────────────────────────────────────────────────────────
@@ -131,7 +241,8 @@ local function collect_frames(session, frames, on_done)
     return
   end
 
-  -- Timestamp (nanoseconds). 0 when the gdbserver doesn't supply it.
+  -- GNU gdbserver's $trace_timestamp uses microseconds. 0 when the target
+  -- does not provide a collected timestamp.
   gdb(session, "print $trace_timestamp", function(_, ts_resp)
     local ts = M.parse_int(ts_resp and ts_resp.result)
 
@@ -179,7 +290,7 @@ local function render(session_name, frames, truncated)
   else
     local has_ts = frames[1].ts ~= 0
     if has_ts then
-      table.insert(lines, string.format("  %-6s  %-20s  %-16s  %s", "#", "Timestamp (ns)", "Delta (μs)", "Function"))
+      table.insert(lines, string.format("  %-6s  %-20s  %-16s  %s", "#", "Timestamp (μs)", "Delta (ms)", "Function"))
     else
       table.insert(lines, string.format("  %-6s  %-52s  %s", "#", "Function", "(no timestamps)"))
     end
@@ -225,6 +336,10 @@ end
 function M.show()
   local session = require("dap").session()
   if not session then vim.notify("No active DAP session", vim.log.levels.WARN); return end
+  if not session.stopped_thread_id then
+    vim.notify("[Trace] Pause the target (<M-p>) before showing the timeline", vim.log.levels.WARN)
+    return
+  end
 
   local name = (session.config and session.config.name) or "unknown"
 

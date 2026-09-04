@@ -163,7 +163,7 @@ local mappings = {
 	{ key = "<leader>gtt", desc = "Set tracepoint at word under cursor", category = "DAP" },
 	{ key = "<leader>gtT", desc = "Set tracepoint at a prompted location", category = "DAP" },
 	{ key = "<leader>gts", desc = "Start tracepoint collection", category = "DAP" },
-	{ key = "<leader>gtv", desc = "Stop collection and show trace timeline", category = "DAP" },
+	{ key = "<leader>gtv", desc = "Show trace timeline (pause target first)", category = "DAP" },
 	{ key = "<leader>gtc", desc = "Clear all tracepoints", category = "DAP" },
 	{ key = "<leader>gti", desc = "Show tracepoint information in the REPL", category = "DAP" },
 	{ key = "<leader>gv", desc = "Open the DAP variable and stack view", category = "DAP" },
