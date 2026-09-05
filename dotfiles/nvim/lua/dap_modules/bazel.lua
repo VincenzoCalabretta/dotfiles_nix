@@ -43,14 +43,80 @@ function M.load_last_target()
   return nil
 end
 
+-- ── direnv activation ────────────────────────────────────────────────────────
+-- Bazel workspaces under dap_modules/examples/ (leetcode_debug, in particular)
+-- rely on a project-local flake devShell (via direnv) to put `bazel`/`gcc`/
+-- `gdb` on PATH. That only happens automatically if whatever shell launched
+-- Neovim had already `cd`ed through the workspace with direnv's hook active.
+-- These helpers let the plugin activate that env itself for every job it
+-- spawns, regardless of how Neovim was started -- without silently bypassing
+-- direnv's one-time-per-path `direnv allow` trust gate, which exists
+-- specifically so a `.envrc` can't run arbitrary shell code unattended.
+
+-- Inspects `direnv status --json` for `workspace`. Returns:
+--   "ok"      - a .envrc exists there and direnv has approved it
+--   "blocked" - a .envrc exists there but direnv hasn't approved it yet
+--   "none"    - no direnv binary, or no .envrc found -- run unwrapped
+function M.direnv_state(workspace)
+  if vim.fn.executable("direnv") ~= 1 then
+    return "none"
+  end
+  -- `direnv status` only ever looks at the process's actual cwd (a trailing
+  -- path argument is silently ignored), so shell out with `cd` first.
+  local out = vim.fn.system({ "bash", "-c", string.format("cd %s && direnv status --json", workspace) })
+  if vim.v.shell_error ~= 0 then
+    return "none"
+  end
+  local ok, decoded = pcall(vim.fn.json_decode, out)
+  if not ok or not decoded or not decoded.state then
+    return "none"
+  end
+  -- JSON `null` decodes to the vim.NIL sentinel, not Lua nil -- direnv
+  -- reports foundRC as null when no .envrc exists anywhere above `workspace`.
+  local found_rc = decoded.state.foundRC
+  if found_rc == nil or found_rc == vim.NIL then
+    return "none"
+  end
+  return found_rc.allowed == 0 and "ok" or "blocked"
+end
+
+-- M.direnv_state() plus a notify when it comes back "blocked", so the
+-- failure is reported once, up front, instead of manifesting later as a
+-- missing binary. Returns the state so callers can also pass it to
+-- direnv_wrap() without querying direnv twice.
+function M.direnv_check(workspace)
+  local state = M.direnv_state(workspace)
+  if state == "blocked" then
+    vim.notify(
+      ("bazel_picker: direnv hasn't approved %s/.envrc yet -- run `direnv allow` there, then retry."):format(workspace),
+      vim.log.levels.ERROR
+    )
+  end
+  return state
+end
+
+-- Wraps `cmd` (a jobstart-style argv table) with `direnv exec workspace` when
+-- direnv has approved a .envrc there. `direnv exec` loads that workspace's
+-- env without changing the process's cwd, so the caller's own `cd` inside
+-- `cmd` still applies.
+function M.direnv_wrap(cmd, workspace, direnv_state)
+  if direnv_state ~= "ok" then
+    return cmd
+  end
+  local wrapped = { "direnv", "exec", workspace }
+  vim.list_extend(wrapped, cmd)
+  return wrapped
+end
+
 -- ── Command building ─────────────────────────────────────────────────────────
 -- Returns a table suitable for vim.fn.jobstart().
 -- Wraps in `docker exec` when container_name is set; runs on host otherwise.
 
-function M.build_command(bazel_config, target, container_name, bazel_bin)
+function M.build_command(bazel_config, target, container_name, bazel_bin, direnv_state)
+  local workspace = vim.fn.getcwd()
   local bazel_cmd = string.format(
     "cd %s && %s run --config=%s %s",
-    vim.fn.getcwd(),
+    workspace,
     bazel_bin or "bazel",
     bazel_config,
     target
@@ -59,7 +125,7 @@ function M.build_command(bazel_config, target, container_name, bazel_bin)
   if container_name then
     return { "docker", "exec", "-i", container_name, "bash", "-c", bazel_cmd }
   else
-    return { "bash", "-c", bazel_cmd }
+    return M.direnv_wrap({ "bash", "-c", bazel_cmd }, workspace, direnv_state)
   end
 end
 
@@ -195,11 +261,15 @@ function M.start_cpp(target)
   local port      = cfg.cpp.gdbserver_port
   local workspace = vim.fn.getcwd()
 
+  -- Docker containers have their own env; direnv on the host is irrelevant.
+  local direnv_state = cfg.cpp.container_name and "none" or M.direnv_check(workspace)
+  if direnv_state == "blocked" then return end
+
   M.save_last_target(target, "cpp")
   M.kill_gdbserver()
 
   local cmd = M.build_command(cfg.cpp.bazel_config, target,
-                              cfg.cpp.container_name, cfg.cpp.bazel_bin)
+                              cfg.cpp.container_name, cfg.cpp.bazel_bin, direnv_state)
 
   print(string.format("Starting gdbserver for: %s (port %d)", target, port))
 
@@ -216,14 +286,19 @@ end
 -- ── Python launcher (debugpy) ────────────────────────────────────────────────
 
 function M.start_python(target)
-  local cfg = require("dap_modules.project").load()
+  local cfg       = require("dap_modules.project").load()
+  local workspace = vim.fn.getcwd()
+
+  local direnv_state = cfg.python.container_name and "none" or M.direnv_check(workspace)
+  if direnv_state == "blocked" then return end
+
   M.save_last_target(target, "python")
   M.kill_gdbserver()
 
   local port          = cfg.python.debugpy_port
   local path_mappings = cfg.python.path_mappings
   local cmd           = M.build_command(
-    cfg.python.bazel_config, target, cfg.python.container_name, cfg.python.bazel_bin
+    cfg.python.bazel_config, target, cfg.python.container_name, cfg.python.bazel_bin, direnv_state
   )
 
   print(string.format("Starting debugpy for: %s (port %d)", target, port))
@@ -283,22 +358,28 @@ end
 -- support in kind() filters. Exported so dap_modules/remote.lua can offer the
 -- same target picker for remote deploys.
 function M.pick_targets(queries, prompt_title, on_select)
-  local cfg = require("dap_modules.project").load()
+  local cfg       = require("dap_modules.project").load()
+  local workspace = vim.fn.getcwd()
+
+  local direnv_state = cfg.cpp.container_name and "none" or M.direnv_check(workspace)
+  if direnv_state == "blocked" then return end
+
   local all_targets = {}
+  local errors = {}
   local remaining = #queries
 
   for _, query_kind in ipairs(queries) do
     local bazel_query = string.format(
-      "cd %s && bazel query 'kind(%s, //...)' --keep_going 2>/dev/null",
-      vim.fn.getcwd(),
+      "cd %s && bazel query 'kind(%s, //...)' --keep_going",
+      workspace,
       query_kind
     )
 
     local cmd
     if cfg.cpp.container_name then
-      cmd = string.format("docker exec %s bash -c \"%s\"", cfg.cpp.container_name, bazel_query)
+      cmd = { "docker", "exec", cfg.cpp.container_name, "bash", "-c", bazel_query }
     else
-      cmd = "bash -c \"" .. bazel_query .. "\""
+      cmd = M.direnv_wrap({ "bash", "-c", bazel_query }, workspace, direnv_state)
     end
 
     vim.fn.jobstart(cmd, {
@@ -314,8 +395,15 @@ function M.pick_targets(queries, prompt_title, on_select)
         remaining = remaining - 1
         -- Only open the picker once all queries have finished
         if remaining == 0 then
+          -- A successful query still writes routine chatter to stderr (direnv's
+          -- own "loading .envrc" lines, Bazel's "Loading: N packages loaded"),
+          -- so only surface stderr when it actually explains an empty result.
           if #all_targets == 0 then
-            print("No targets found")
+            if #errors > 0 then
+              vim.notify(table.concat(errors, "\n"), vim.log.levels.ERROR, { title = "bazel query failed" })
+            else
+              vim.notify("No targets found", vim.log.levels.WARN, { title = "bazel query" })
+            end
             return
           end
 
@@ -343,7 +431,7 @@ function M.pick_targets(queries, prompt_title, on_select)
       on_stderr = function(_, data)
         if not data then return end
         for _, line in ipairs(data) do
-          if line and line ~= "" then print("Query error: " .. line) end
+          if line and line ~= "" then table.insert(errors, line) end
         end
       end,
     })
@@ -435,12 +523,17 @@ function M.launch_python_simple()
 end
 
 function M.start_rust(target)
-  local cfg = require("dap_modules.project").load()
+  local cfg       = require("dap_modules.project").load()
+  local workspace = vim.fn.getcwd()
+
+  local direnv_state = cfg.rust.container_name and "none" or M.direnv_check(workspace)
+  if direnv_state == "blocked" then return end
+
   M.save_last_target(target, "rust")
   M.kill_gdbserver()
 
   local port = cfg.rust.gdbserver_port
-  local cmd  = M.build_command(cfg.rust.bazel_config, target, cfg.rust.container_name, cfg.rust.bazel_bin)
+  local cmd  = M.build_command(cfg.rust.bazel_config, target, cfg.rust.container_name, cfg.rust.bazel_bin, direnv_state)
 
   print(string.format("Starting gdbserver for Rust: %s (port %d)", target, port))
   M.gdbserver_job_id = M.start_job(cmd, "Listening on port " .. port, "gdbserver", function()
