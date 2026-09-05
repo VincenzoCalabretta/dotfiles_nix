@@ -22,7 +22,7 @@ function M.setup(bazel)
   vim.fn.sign_define("DapBreakpointRejected",  { text = "○", texthl = "DiagnosticInfo"                        })
   vim.fn.sign_define("DapStopped",             { text = "→", texthl = "DiagnosticWarn", linehl = "CursorLine" })
   vim.fn.sign_define("DapLogPoint",            { text = "◎", texthl = "DiagnosticInfo"                        })
-  vim.fn.sign_define("DapTracepoint",          { text = "◉", texthl = "DiagnosticHint"                        })
+  vim.fn.sign_define("DapTracepoint",          { text = "◇", texthl = "DiagnosticHint"                        })
 
   -- ── Adapters ───────────────────────────────────────────────────────────────
 

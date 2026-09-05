@@ -144,7 +144,7 @@ describe("dap_modules.trace", function()
     local trace_scripts
 
     before_each(function()
-      vim.fn.sign_define("DapTracepoint", { text = "◉" })
+      vim.fn.sign_define("DapTracepoint", { text = "◇" })
       trace_scripts = {}
       session = {
         id = 4242,
