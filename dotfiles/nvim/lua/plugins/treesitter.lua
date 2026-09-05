@@ -14,7 +14,8 @@ return {
 
       -- Ensure parsers are installed
       install.ensure_installed = {
-        'bash', 'c', 'cpp', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'vim', 'vimdoc'
+        'bash', 'c', 'cpp', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'vim', 'vimdoc',
+        'mlir', 'tablegen'
       }
 
       -- Enable highlight for all buffers

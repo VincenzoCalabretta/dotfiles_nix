@@ -231,9 +231,29 @@ return {
         capabilities = capabilities,
       })
 
+      -- MLIR
+      -- Not mason-managed: installed via Nix (modules/nvim.nix), ships as
+      -- part of llvmPackages.mlir. Only knows MLIR's built-in dialects.
+      vim.lsp.config('mlir_lsp', {
+        cmd = { 'mlir-lsp-server' },
+        filetypes = { 'mlir' },
+        root_markers = { '.git' },
+        capabilities = capabilities,
+      })
+
+      -- TableGen (.td)
+      -- Same package as mlir_lsp above. Full cross-file resolution needs a
+      -- tablegen_compile_commands.json (CMake-generated); falls back to
+      -- single-file parsing without one.
+      vim.lsp.config('tblgen_lsp', {
+        cmd = { 'tblgen-lsp-server' },
+        filetypes = { 'tablegen' },
+        root_markers = { 'tablegen_compile_commands.json', '.git' },
+        capabilities = capabilities,
+      })
 
       -- ── 6. Enable servers ─────────────────────────────────────────────
-      vim.lsp.enable({ 'lua_ls', 'ruff', 'basedpyright', 'rust_analyzer', 'clangd', 'nixd' })
+      vim.lsp.enable({ 'lua_ls', 'ruff', 'basedpyright', 'rust_analyzer', 'clangd', 'nixd', 'mlir_lsp', 'tblgen_lsp' })
 
       -- ── 7. Diagnostics display ────────────────────────────────────────
       vim.diagnostic.config({

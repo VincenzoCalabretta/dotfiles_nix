@@ -64,6 +64,16 @@ in
     rust-analyzer
     clang-tools     # provides clangd
     nixd            # Nix LSP; also used by opencode (modules/opencode.nix)
+
+    # MLIR / TableGen LSPs (mlir-lsp-server, tblgen-lsp-server). Not
+    # mason-managed: mason has no MLIR package, and building mlir-lsp-server
+    # from source is a full LLVM/MLIR build. llvmPackages.mlir ships
+    # prebuilt tool binaries and has a cached substitute on cache.nixos.org
+    # for the pinned nixpkgs revision, so this doesn't compile locally.
+    # Only understands MLIR's built-in dialects -- a downstream project with
+    # custom dialects needs its own project-built mlir-lsp-server for full
+    # diagnostics on its ops.
+    llvmPackages.mlir
     ];
 
     xdg.configFile."nvim".source = ../dotfiles/nvim;
