@@ -4,13 +4,14 @@
 
 local M = {}
 local db = require('nvim_game.db')
+local capture = require('nvim_game.input')
+local practice = require('nvim_game.practice')
 
 --------------------------------------------------------------------------------
 -- Constants
 --------------------------------------------------------------------------------
 local W, H   = 72, 26
 local NS     = vim.api.nvim_create_namespace('nvim_game')
-local LEADER = '<leader>'
 
 -- Points awarded per correct answer; streak multiplier kicks in at 3+.
 local BASE_SCORE     = 10
@@ -51,7 +52,7 @@ local function reset_state()
   S = {
     buf        = nil,
     win        = nil,
-    phase      = 'menu',   -- 'menu' | 'question' | 'feedback' | 'results'
+    phase      = 'menu',   -- 'menu' | 'question' | 'remediation' | 'feedback' | 'results'
     input      = '',
     score      = 0,
     streak     = 0,
@@ -59,6 +60,7 @@ local function reset_state()
     correct    = 0,
     wrong      = 0,
     skipped    = 0,
+    corrected  = 0,      -- wrong initially, then practiced successfully
     -- question list for current session
     questions  = {},
     q_idx      = 1,
@@ -66,9 +68,8 @@ local function reset_state()
     categories = nil,    -- nil = all
     cat_cursor = 1,      -- menu cursor
     cat_list   = {},     -- [1..n] + 'ALL' entry
-    -- feedback
-    was_correct = false,
-    correct_key = '',
+    -- The explicit record avoids relying on q_idx after a re-queue.
+    last_attempt = nil,
   }
 end
 
@@ -185,6 +186,7 @@ local function open_win()
 end
 
 local function close_win()
+  practice.close()
   if S.win and vim.api.nvim_win_is_valid(S.win) then
     vim.api.nvim_win_close(S.win, true)
   end
@@ -197,61 +199,8 @@ end
 --------------------------------------------------------------------------------
 -- Key mapping (game buffer)
 --------------------------------------------------------------------------------
-local function clear_keys()
-  pcall(vim.api.nvim_buf_clear_namespace, S.buf, NS, 0, -1)
-end
-
-local function bind(key, action, modes)
-  modes = modes or { 'n' }
-  vim.keymap.set(modes, key, function()
-    M.handle_key(action)
-  end, { buffer = S.buf, nowait = true, silent = true })
-end
-
 local function setup_keys()
-  -- All printable keys that appear in keybindings
-  local alpha = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
-  local digits = '1234567890'
-  local puncts = {
-    '!', '"', '#', '$', '%', '&', '(', ')', '*', '+', ',', '-', '.', '/',
-    ':', ';', '<', '=', '>', '?', '@', '[', '\\', ']', '^', '_', '`', '{',
-    '|', '}', '~', "'",
-  }
-
-  for i = 1, #alpha do  bind(alpha:sub(i,i), alpha:sub(i,i)) end
-  for i = 1, #digits do bind(digits:sub(i,i), digits:sub(i,i)) end
-  for _, c in ipairs(puncts) do bind(c, c) end
-
-  -- Space = <leader> in answers
-  bind('<Space>', LEADER)
-
-  -- Control combos used by configured and built-in Neovim mappings.
-  for c = string.byte('a'), string.byte('z') do
-    local char = string.char(c)
-    bind('<C-' .. char .. '>', '<C-' .. char .. '>')
-  end
-  for _, key in ipairs({ '<Tab>', '<S-Tab>' }) do
-    bind(key, key)
-  end
-
-  -- Alt combos used by the DAP mappings. Neovim normalizes Alt as <M-...>.
-  for _, c in ipairs({ 'a', 'b', 'B', 'c', 'f', 'g', 'n', 'o', 'p', 'r', 's', 't', 'w' }) do
-    bind('<M-' .. c .. '>', '<M-' .. c .. '>')
-  end
-
-  -- Game control
-  bind('<CR>',  '__submit__')
-  bind('<BS>',  '__bs__')
-  -- Escape is a quiz answer token, never a close action.  Use <C-c> to
-  -- skip a question or close the game.
-  bind('<Esc>', '__escape__')
-  bind('<C-c>', '__quit__')
-
-  -- Menu navigation
-  bind('j', '__down__')
-  bind('k', '__up__')
-  -- 'j' and 'k' also get bound above to append; we'll route them correctly
-  -- in handle_key based on phase.
+  capture.setup(S.buf, M.handle_key)
 end
 
 --------------------------------------------------------------------------------
@@ -433,7 +382,9 @@ end
 -- Phase: FEEDBACK
 --------------------------------------------------------------------------------
 local function render_feedback()
-  local q = S.questions[S.q_idx - 1] or S.questions[#S.questions]
+  local attempt = S.last_attempt
+  local q = attempt and attempt.question or S.questions[S.q_idx - 1] or S.questions[#S.questions]
+  if not q then return end
 
   local lines, hls_list = {}, {}
   table.insert(lines, '')
@@ -441,7 +392,7 @@ local function render_feedback()
   table.insert(lines, '')
   table.insert(lines, '')
 
-  if S.was_correct then
+  if attempt and attempt.status == 'correct' then
     local pts = BASE_SCORE * (S.streak >= STREAK_THRESH and S.streak or 1)
     table.insert(lines, pad_center('✓  CORRECT!'))
     hls_list[#hls_list+1] = { #lines - 1, 0, -1, 'NvimGameCorrect' }
@@ -449,11 +400,24 @@ local function render_feedback()
     table.insert(lines, pad_center(string.format('+%d points', pts)
       .. (S.streak >= STREAK_THRESH and string.format('  (×%d streak!)', S.streak) or '')))
     hls_list[#hls_list+1] = { #lines - 1, 0, -1, 'NvimGameScore' }
+  elseif attempt and attempt.status == 'skipped' then
+    table.insert(lines, pad_center('↷  SKIPPED'))
+    hls_list[#hls_list+1] = { #lines - 1, 0, -1, 'NvimGameWrong' }
+    table.insert(lines, '')
+    table.insert(lines, pad_center('This key will return later in the session.'))
+    hls_list[#hls_list+1] = { #lines - 1, 0, -1, 'NvimGameSubtitle' }
+  elseif attempt and attempt.corrected then
+    table.insert(lines, pad_center('✓  CORRECTED WITH PROMPT'))
+    hls_list[#hls_list+1] = { #lines - 1, 0, -1, 'NvimGameCorrect' }
+    table.insert(lines, '')
+    table.insert(lines, pad_center('The correct key was practiced in its example buffer.'))
+    hls_list[#hls_list+1] = { #lines - 1, 0, -1, 'NvimGameSubtitle' }
   else
     table.insert(lines, pad_center('✗  WRONG'))
     hls_list[#hls_list+1] = { #lines - 1, 0, -1, 'NvimGameWrong' }
     table.insert(lines, '')
-    local you_line = pad_center('You typed:   ' .. (S.input ~= '' and S.input or '(empty)'))
+    local answer = attempt and attempt.answer or S.input
+    local you_line = pad_center('You typed:   ' .. (answer ~= '' and answer or '(empty)'))
     table.insert(lines, you_line)
     hls_list[#hls_list+1] = { #lines - 1, 0, -1, 'NvimGameSubtitle' }
   end
@@ -468,7 +432,7 @@ local function render_feedback()
     hls_list[#hls_list+1] = { al, off + ks, off + ke, 'NvimGameKey' }
   end
 
-  if not S.was_correct then
+  if attempt and attempt.status ~= 'correct' then
     table.insert(lines, '')
     table.insert(lines, pad_center('↺  Added back to retry queue'))
     hls_list[#hls_list+1] = { #lines - 1, 0, -1, 'NvimGameHint' }
@@ -514,6 +478,7 @@ local function render_results()
     { 'Final score',   tostring(S.score)   },
     { 'Correct',       string.format('%d / %d (%d%%)', S.correct, total, acc) },
     { 'Wrong',         tostring(S.wrong)   },
+    { 'Corrected',     tostring(S.corrected) },
     { 'Skipped',       tostring(S.skipped) },
     { 'Best streak',   tostring(S.max_streak) },
   }
@@ -541,7 +506,7 @@ local function render()
   vim.api.nvim_buf_clear_namespace(S.buf, NS, 0, -1)
   if     S.phase == 'menu'     then render_menu()
   elseif S.phase == 'question' then render_question()
-  elseif S.phase == 'feedback' then render_feedback()
+  elseif S.phase == 'remediation' or S.phase == 'feedback' then render_feedback()
   elseif S.phase == 'results'  then render_results()
   end
 end
@@ -564,6 +529,26 @@ local function advance()
   end
 end
 
+local function finish_remediation()
+  if S.phase ~= 'remediation' or not S.last_attempt then return end
+  S.last_attempt.corrected = true
+  S.corrected = S.corrected + 1
+  S.q_idx = S.q_idx + 1
+  S.phase = 'feedback'
+  render()
+end
+
+local function begin_remediation(q, answer)
+  S.phase = 'remediation'
+  render()
+  practice.open(q, {
+    parent_win = S.win,
+    wrong_answer = answer,
+    on_success = finish_remediation,
+    on_abort = close_win,
+  })
+end
+
 local function submit()
   local q = current_q()
   if not q then return end
@@ -571,21 +556,29 @@ local function submit()
   local answer  = vim.trim(S.input)
   local correct = (answer == q.key)
 
-  S.was_correct = correct
-  S.q_idx       = S.q_idx + 1
+  S.last_attempt = {
+    question = vim.deepcopy(q),
+    answer = answer,
+    status = correct and 'correct' or 'wrong',
+    corrected = false,
+  }
 
   if correct then
+    S.q_idx       = S.q_idx + 1
     S.streak     = S.streak + 1
     if S.streak > S.max_streak then S.max_streak = S.streak end
     local mult   = S.streak >= STREAK_THRESH and S.streak or 1
     S.score      = S.score + BASE_SCORE * mult
     S.correct    = S.correct + 1
   else
-    -- Re-queue the question at a random later position
-    local requeue_at = math.random(S.q_idx, #S.questions + 1)
+    -- Re-queue it for later unaided recall, but do not advance until the
+    -- foreground exercise has captured the displayed correct sequence.
+    local requeue_at = math.random(S.q_idx + 1, #S.questions + 1)
     table.insert(S.questions, requeue_at, vim.deepcopy(q))
     S.streak = 0
     S.wrong  = S.wrong + 1
+    begin_remediation(q, answer)
+    return
   end
 
   S.phase = 'feedback'
@@ -601,8 +594,13 @@ local function skip()
   S.q_idx   = S.q_idx + 1
   S.streak  = 0
   S.skipped = S.skipped + 1
+  S.last_attempt = {
+    question = vim.deepcopy(q),
+    answer = '',
+    status = 'skipped',
+    corrected = false,
+  }
   S.phase   = 'feedback'
-  S.was_correct = false
   render()
 end
 
@@ -634,18 +632,12 @@ function M.handle_key(action)
     if action == '__submit__' then
       submit()
     elseif action == '__bs__' then
-      -- Remove last token: if ends with '>', strip back to '<'
-      if S.input:sub(-1) == '>' then
-        local p = S.input:find('<[^<>]*>$')
-        S.input = p and S.input:sub(1, p - 1) or S.input:sub(1, -2)
-      else
-        S.input = S.input:sub(1, -2)
-      end
+      S.input = capture.backspace(S.input)
       render()
     elseif action == '__escape__' then
       -- Escape is a valid Neovim keybinding answer, so it must not be
       -- confused with the game's quit control.
-      S.input = S.input .. '<Esc>'
+      S.input = capture.append(S.input, action)
       render()
     elseif action == '__quit__' then
       -- <C-c> from question → skip
@@ -664,13 +656,18 @@ function M.handle_key(action)
     end
     advance()
 
+  elseif S.phase == 'remediation' then
+    -- The exercise owns focus and key capture.  Retain one escape hatch for
+    -- callers that invoke handle_key directly (for example a test harness).
+    if action == '__quit__' then close_win() end
+
   elseif S.phase == 'results' then
     if action == '__quit__' then
       close_win()
     elseif action == '__submit__' then
       -- Play again — back to menu
       S.score, S.streak, S.max_streak = 0, 0, 0
-      S.correct, S.wrong, S.skipped   = 0, 0, 0
+      S.correct, S.wrong, S.skipped, S.corrected = 0, 0, 0, 0
       S.phase    = 'menu'
       S.cat_cursor = 1
       render()
@@ -682,6 +679,7 @@ end
 -- Public API
 --------------------------------------------------------------------------------
 function M.start(cats)
+  close_win()
   setup_hl()
   reset_state()
   S.categories = cats
@@ -702,6 +700,11 @@ end
 
 function M.start_category(cat)
   M.start({ cat })
+end
+
+-- Internal inspection hook used by tests; normal callers should use start().
+function M._state_for_test()
+  return S
 end
 
 return M

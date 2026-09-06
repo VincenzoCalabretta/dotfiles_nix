@@ -31,8 +31,11 @@ start()
             ├─ <C-c> skips the question (re-queues it)
             └─ <Enter> submits
                  ├─ correct → score + streak → FEEDBACK
-                 └─ wrong   → re-insert at random later position → FEEDBACK
-                      └─ any key → QUESTION (next)
+                 └─ wrong   → re-insert at random later position
+                      └─ CORRECTION EXERCISE (foreground example buffer)
+                           ├─ shows the correct key and realistic context
+                           ├─ captures that exact sequence without running it
+                           └─ success → FEEDBACK → any key → QUESTION (next)
                            └─ queue exhausted → RESULTS
                                 ├─ <Enter> → back to MENU
                                 └─ <C-c>  → close window
@@ -53,6 +56,24 @@ Wrong and skipped questions are re-inserted at a random index
 `[current_idx+1 .. end_of_queue]`. This means a question you get wrong
 early will resurface later in the same session. There is no cross-session
 memory yet (see planned features).
+
+### Correction exercises
+
+Submitting a wrong answer now opens a dedicated foreground scratch buffer.
+It renders a contextual fixture for the missed mapping (source, a diagnostic,
+a Git hunk, an outline, a debugger state, and so on) and prominently displays
+the correct key. The user must type that exact physical key sequence before
+the game can continue. The buffer captures the sequence with its own
+buffer-local mappings: it **never executes the configured mapping**, so drills
+remain safe for actions that would stage a hunk, run a target, or change an
+external tool's state.
+
+`examples.lua` resolves an exercise for every database entry. The 154 curated
+bindings have category-specific fixtures, the optional Compiler Explorer
+bindings have an assembly fixture, and runtime-discovered Neovim defaults are
+given a fixture based on their reported mode (with a safe generic fallback for
+new defaults in later Neovim releases). `tests/nvim-game.lua` fails when any
+question cannot resolve an exercise.
 
 ### Key capture mechanism
 
@@ -212,6 +233,9 @@ Special tokens:
 lua/nvim_game/
   db.lua            built-in keybinding database
   init.lua          game engine + UI + key capture
+  input.lua         shared, side-effect-free key token capture
+  examples.lua      contextual correction-exercise catalog
+  practice.lua      foreground correction buffer and gate
   progress.lua      (planned) cross-session SM-2 progress tracker
   scores.lua        (planned) high score / achievement persistence
   discovery.lua     (planned) auto-discover keymaps from vim API

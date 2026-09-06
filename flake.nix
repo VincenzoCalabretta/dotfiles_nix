@@ -148,6 +148,16 @@
             +qa
           touch "$out"
         '';
+        nvim-game = pkgs.runCommand "nvim-game-test" {
+          nativeBuildInputs = [ pkgs.neovim ];
+        } ''
+          export HOME="$TMPDIR"
+          nvim --headless --clean -u NONE \
+            '+set runtimepath+=${./dotfiles/nvim}' \
+            '+luafile ${./tests/nvim-game.lua}' \
+            +qa
+          touch "$out"
+        '';
 
         # Runs dotfiles/nvim/lua/dap_modules' own plenary test suite and
         # renders its line-coverage HTML report (see
