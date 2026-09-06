@@ -1,4 +1,5 @@
--- User-facing mappings, kept in sync with the actual configuration.
+-- User-facing mappings plus Neovim core defaults, kept in sync with the
+-- actual configuration.
 -- Each entry: { key, desc, category, hint (optional) }
 
 local mappings = {
@@ -192,6 +193,61 @@ if compiler_explorer_enabled then
     desc = 'Show assembly instruction/register documentation',
     category = 'Compiler Explorer',
   })
+end
+
+-- Neovim registers its own default mappings with the internal script id -8.
+-- Add every described, user-typeable default at runtime so this category stays
+-- aligned with the installed Neovim version.  Explicit mappings above win if
+-- the configuration replaces a default.
+local core_modes = {
+  n = 'normal',
+  i = 'insert',
+  c = 'command-line',
+  x = 'visual',
+  o = 'operator-pending',
+  s = 'select',
+}
+
+local function canonical_key(key)
+  -- Neovim reports control-key names with an uppercase letter, while the game
+  -- records them in lowercase (for example, <C-l>).
+  key = key:gsub('<C%-([A-Z])>', function(letter)
+    return '<C-' .. letter:lower() .. '>'
+  end)
+  -- Space is the configured leader in this setup, and the game already uses
+  -- <leader> as the answer token for it.
+  return key:gsub('<Space>', '<leader>')
+end
+
+local known_keys = {}
+for _, mapping in ipairs(mappings) do
+  known_keys[mapping.key] = true
+end
+
+local defaults = {}
+for mode, mode_name in pairs(core_modes) do
+  for _, map in ipairs(vim.api.nvim_get_keymap(mode)) do
+    local key = canonical_key(map.lhs)
+    if map.sid == -8 and map.desc and not key:match('^<Plug>') and not known_keys[key] then
+      local entry = defaults[key]
+      if entry then
+        entry.modes[#entry.modes + 1] = mode_name
+      else
+        defaults[key] = {
+          key = key,
+          desc = map.desc:gsub('^:help ', ''),
+          category = 'Neovim defaults',
+          modes = { mode_name },
+        }
+      end
+    end
+  end
+end
+
+for _, entry in pairs(defaults) do
+  entry.hint = 'Mode: ' .. table.concat(entry.modes, ' / ')
+  entry.modes = nil
+  table.insert(mappings, entry)
 end
 
 return mappings

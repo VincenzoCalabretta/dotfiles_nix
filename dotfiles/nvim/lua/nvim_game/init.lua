@@ -212,7 +212,11 @@ local function setup_keys()
   -- All printable keys that appear in keybindings
   local alpha = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
   local digits = '1234567890'
-  local puncts = { '[', ']', '.', '/', ';', ',', "'", '-', '=' }
+  local puncts = {
+    '!', '"', '#', '$', '%', '&', '(', ')', '*', '+', ',', '-', '.', '/',
+    ':', ';', '<', '=', '>', '?', '@', '[', '\\', ']', '^', '_', '`', '{',
+    '|', '}', '~', "'",
+  }
 
   for i = 1, #alpha do  bind(alpha:sub(i,i), alpha:sub(i,i)) end
   for i = 1, #digits do bind(digits:sub(i,i), digits:sub(i,i)) end
@@ -221,11 +225,14 @@ local function setup_keys()
   -- Space = <leader> in answers
   bind('<Space>', LEADER)
 
-  -- Control combos used as keybindings
-  for _, c in ipairs({ 'h', 'j', 'k', 'l' }) do
-    bind('<C-' .. c .. '>', '<C-' .. c .. '>')
+  -- Control combos used by configured and built-in Neovim mappings.
+  for c = string.byte('a'), string.byte('z') do
+    local char = string.char(c)
+    bind('<C-' .. char .. '>', '<C-' .. char .. '>')
   end
-  bind('<C-s>', '<c-s>')
+  for _, key in ipairs({ '<Tab>', '<S-Tab>' }) do
+    bind(key, key)
+  end
 
   -- Alt combos used by the DAP mappings. Neovim normalizes Alt as <M-...>.
   for _, c in ipairs({ 'a', 'b', 'B', 'c', 'f', 'g', 'n', 'o', 'p', 'r', 's', 't', 'w' }) do
@@ -235,7 +242,9 @@ local function setup_keys()
   -- Game control
   bind('<CR>',  '__submit__')
   bind('<BS>',  '__bs__')
-  bind('<Esc>', '<Esc>')
+  -- Escape is a quiz answer token, never a close action.  Use <C-c> to
+  -- skip a question or close the game.
+  bind('<Esc>', '__escape__')
   bind('<C-c>', '__quit__')
 
   -- Menu navigation
@@ -324,7 +333,7 @@ local function render_menu()
 
   table.insert(lines, '')
   table.insert(lines, DIVIDER)
-  table.insert(lines, pad_center('j/k  navigate    <Enter>  start    <Esc>  quit'))
+  table.insert(lines, pad_center('j/k  navigate    <Enter>  start    <C-c>  quit'))
   local last = #lines
   hls_list[#hls_list+1] = { last - 1, 0, -1, 'NvimGameMuted' }
   hls_list[#hls_list+1] = { last,     0, -1, 'NvimGameMuted' }
@@ -411,7 +420,7 @@ local function render_question()
 
   table.insert(lines, '')
   table.insert(lines, DIVIDER)
-  table.insert(lines, pad_center('<Space>=<leader>  <Enter> submit  <BS> backspace  <Esc> quit'))
+  table.insert(lines, pad_center('<Space>=<leader>  <Esc> answer  <Enter> submit  <C-c> skip'))
   hls_list[#hls_list+1] = { #lines - 1, 0, -1, 'NvimGameMuted' }
 
   while #lines < H do table.insert(lines, '') end
@@ -515,7 +524,7 @@ local function render_results()
 
   table.insert(lines, '')
   table.insert(lines, DIVIDER)
-  table.insert(lines, pad_center('<Enter> play again   <Esc> quit'))
+  table.insert(lines, pad_center('<Enter> play again   <C-c> quit'))
   hls_list[#hls_list+1] = { #lines - 1, 0, -1, 'NvimGameMuted' }
 
   while #lines < H do table.insert(lines, '') end
@@ -632,6 +641,11 @@ function M.handle_key(action)
       else
         S.input = S.input:sub(1, -2)
       end
+      render()
+    elseif action == '__escape__' then
+      -- Escape is a valid Neovim keybinding answer, so it must not be
+      -- confused with the game's quit control.
+      S.input = S.input .. '<Esc>'
       render()
     elseif action == '__quit__' then
       -- <C-c> from question → skip
