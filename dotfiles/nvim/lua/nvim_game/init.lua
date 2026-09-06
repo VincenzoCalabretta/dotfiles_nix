@@ -113,6 +113,21 @@ local function find_hl(line_str, sub)
   return nil, nil
 end
 
+local function wrap_text(text, width)
+  local wrapped = {}
+  while #text > width do
+    local break_at = width
+    while break_at > 1 and text:sub(break_at, break_at) ~= ' ' do
+      break_at = break_at - 1
+    end
+    if break_at == 1 then break_at = width end
+    table.insert(wrapped, text:sub(1, break_at))
+    text = vim.trim(text:sub(break_at + 1))
+  end
+  table.insert(wrapped, text)
+  return wrapped
+end
+
 --------------------------------------------------------------------------------
 -- Category helpers
 --------------------------------------------------------------------------------
@@ -326,17 +341,7 @@ local function render_question()
   local desc = q.desc
   -- Wrap description to W-6 chars
   local max_desc_w = W - 6
-  local wrapped = {}
-  while #desc > max_desc_w do
-    local break_at = max_desc_w
-    while break_at > 1 and desc:sub(break_at, break_at) ~= ' ' do
-      break_at = break_at - 1
-    end
-    if break_at == 1 then break_at = max_desc_w end
-    table.insert(wrapped, desc:sub(1, break_at))
-    desc = vim.trim(desc:sub(break_at + 1))
-  end
-  table.insert(wrapped, desc)
+  local wrapped = wrap_text(desc, max_desc_w)
 
   local box_w = max_desc_w + 4
   local box_pad = string.rep(' ', math.floor((W - box_w) / 2))
@@ -348,6 +353,21 @@ local function render_question()
     hls_list[#hls_list+1] = { #lines - 1, #box_pad + 1, #box_pad + 1 + #inner, 'NvimGameTitle' }
   end
   table.insert(lines, box_pad .. '└' .. string.rep('─', box_w - 2) .. '┘')
+
+  -- Neovim's defaults often have compact historical spellings. Show the
+  -- complete mnemonic explanation directly beside the question, not only
+  -- after a failed answer in the correction tab.
+  if q.explanation then
+    table.insert(lines, '')
+    for _, explanation_line in ipairs(wrap_text('Why this key: ' .. q.explanation, max_desc_w)) do
+      table.insert(lines, pad_center(explanation_line))
+      hls_list[#hls_list+1] = { #lines - 1, 0, -1, 'NvimGameSubtitle' }
+    end
+    if q.help then
+      table.insert(lines, pad_center('Learn more: :help ' .. q.help))
+      hls_list[#hls_list+1] = { #lines - 1, 0, -1, 'NvimGameHint' }
+    end
+  end
 
   -- Hint (if any)
   if q.hint then

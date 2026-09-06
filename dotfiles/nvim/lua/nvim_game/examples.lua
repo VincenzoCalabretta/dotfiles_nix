@@ -347,6 +347,8 @@ function M.resolve(question)
 	local result = vim.deepcopy(template)
 	result.key = question.key
 	result.description = question.desc
+	result.explanation = question.explanation
+	result.help = question.help
 	result.category = question.category
 	result.action = question.category == "Neovim defaults" and "default" or category_actions[question.category]
 	result.exercise_id = question.category == "Neovim defaults" and ("core:" .. question.key)

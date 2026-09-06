@@ -74,9 +74,21 @@ the game advances.
 `examples.lua` resolves an exercise for every database entry. The 154 curated
 bindings have category-specific fixtures, the optional Compiler Explorer
 bindings have an assembly fixture, and runtime-discovered Neovim defaults are
-given a fixture based on their reported mode (with a safe generic fallback for
-new defaults in later Neovim releases). `tests/nvim-game.lua` fails when any
-question cannot resolve an exercise.
+given a fixture based on their reported mode.
+
+### Default-key explanations
+
+`default_explanations.lua` turns Neovim's internal default-map labels (such as
+`v_#-default` and `:cpfile`) into teachable records. Every discovered default
+has a plain-language action, an explanation of its mnemonic, convention, or
+history, and a relevant `:help` topic. The explanation appears in the question
+window and in the correction tab. The complete current-runtime catalog covers
+the directional `[`/`]` families, LSP, comments, snippets, Visual macros,
+search, insertion, and structural-selection defaults. Where a configured
+mapping shares a physical key in a different mode, both mode-specific lessons
+remain available (for example command-line Flash Ctrl-S and Insert/Select LSP
+signature help). New upstream defaults remain playable with a visible fallback
+explanation, and the test suite fails until they receive a curated explanation.
 
 ### Key capture mechanism
 

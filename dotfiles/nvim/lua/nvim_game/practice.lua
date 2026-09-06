@@ -54,12 +54,18 @@ local function info_lines()
 		"Goal: " .. example.description,
 		"Context: " .. example.title,
 		"Mode: " .. example.mode,
-		"",
 		"The source window is an editable fixture in this tab.",
 		"Press the displayed key there to run its isolated drill.",
-		"",
-		"<C-c> abandons this game session.",
 	}
+	if example.explanation then
+		lines[#lines + 1] = ""
+		lines[#lines + 1] = "Why this key: " .. example.explanation
+		if example.help then
+			lines[#lines + 1] = "Learn more: :help " .. example.help
+		end
+	end
+	lines[#lines + 1] = ""
+	lines[#lines + 1] = "<C-c> abandons this game session."
 	if P.completed then
 		lines[#lines + 1] = ""
 		lines[#lines + 1] = "✓ Key executed in the correction tab"

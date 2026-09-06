@@ -15,19 +15,39 @@ local missing = examples.coverage(db)
 assert(#missing == 0, table.concat(missing, "\n"))
 
 local configured = 0
+local documented_defaults = 0
+local ctrl_s_categories = {}
 for _, question in ipairs(db) do
+	if question.key == "<C-s>" then
+		ctrl_s_categories[question.category] = true
+	end
 	if question.category ~= "Neovim defaults" then
 		configured = configured + 1
+		if question.key == "[d" or question.key == "]d" then
+			assert(question.explanation and question.help, "missing explanation for curated default: " .. question.key)
+		end
+	else
+		documented_defaults = documented_defaults + 1
+		assert(question.raw_desc and question.raw_desc ~= "", "missing runtime default source: " .. question.key)
+		assert(question.explanation and question.explanation ~= "", "missing explanation for default: " .. question.key)
+		assert(question.help and question.help ~= "", "missing help topic for default: " .. question.key)
+		assert(not question.explanation_fallback, "default needs curated explanation: " .. question.key)
+		assert(not question.desc:find("%-default"), "internal help tag leaked: " .. question.key)
+		assert(not question.desc:match("^:"), "implementation command leaked: " .. question.key)
 	end
 	local exercise = examples.resolve(question)
 	assert(exercise.key == question.key)
 	assert(exercise.description == question.desc)
+	assert(exercise.explanation == question.explanation)
+	assert(exercise.help == question.help)
 	assert(#exercise.lines > 0, "empty example for " .. question.key)
 	assert(exercise.cursor >= 1 and exercise.cursor <= #exercise.lines, "invalid cursor for " .. question.key)
 	assert(capture.can_capture(question.key), "uncapturable key: " .. question.key)
 	assert(exercise.action, "missing real-tab action for " .. question.key)
 end
 assert(configured >= 154, "configured bindings unexpectedly disappeared")
+assert(documented_defaults >= 59, "Neovim default catalog unexpectedly shrank")
+assert(ctrl_s_categories.Navigation and ctrl_s_categories["Neovim defaults"], "mode-specific Ctrl-S lessons were collapsed")
 
 -- The conditional Compiler Explorer mapping must retain an exercise even when
 -- the test environment does not enable that optional feature.
@@ -89,6 +109,41 @@ assert(
 	"practice did not complete"
 )
 assert(not practice.active())
+
+-- Runtime-discovered defaults must teach both the action and the convention
+-- behind the spelling in the same real correction tab used during play.
+local default_success = false
+practice.open({
+	key = "#",
+	desc = "Search backward for the selected text",
+	category = "Neovim defaults",
+	explanation = "`*` and `#` are a directional pair.",
+	help = "v_#",
+}, {
+	on_success = function()
+		default_success = true
+	end,
+})
+local default_drill = practice._state_for_test()
+local default_info = table.concat(vim.api.nvim_buf_get_lines(default_drill.info_buf, 0, -1, false), "\n")
+assert(default_info:find("Why this key: `*` and `#` are a directional pair.", 1, true))
+assert(default_info:find("Learn more: :help v_#", 1, true))
+feed_mapping("#")
+assert(vim.wait(1000, function()
+	return default_success
+end), "documented default drill did not complete")
+assert(not practice.active())
+
+-- The same explanation is visible before an answer is submitted, so defaults
+-- are understandable even when the player gets them right on the first try.
+game.start_category("Neovim defaults")
+local default_game = game._state_for_test()
+local question_text = table.concat(vim.api.nvim_buf_get_lines(default_game.buf, 0, -1, false), "\n")
+assert(question_text:find("Why this key:", 1, true))
+assert(question_text:find("Learn more: :help", 1, true))
+game.handle_key("__quit__")
+game.handle_key("__quit__")
+assert(default_game.buf == nil)
 
 -- Full game transition: a wrong answer stays on the current question until
 -- the example captures the shown binding, then the original is re-queued for

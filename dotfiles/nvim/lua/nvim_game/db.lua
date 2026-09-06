@@ -101,7 +101,7 @@ local mappings = {
   { key = 'gS', desc = 'Flash Tree-sitter jump', category = 'Navigation' },
   { key = 'r', desc = 'Flash remote motion (operator-pending)', category = 'Navigation' },
   { key = 'R', desc = 'Flash Tree-sitter search (operator/visual)', category = 'Navigation' },
-  { key = '<C-s>', desc = 'Toggle Flash search (command line)', category = 'Navigation' },
+  { key = '<C-s>', desc = 'Toggle Flash search (command line)', category = 'Navigation', modes = { c = true } },
 
   -- ── Textobjects ──────────────────────────────────────────────────────────
   { key = 'aF', desc = 'Around function declaration', category = 'Textobjects', hint = 'daF, caF, vaF, yaF' },
@@ -178,6 +178,19 @@ local mappings = {
   { key = '<leader>X', desc = 'Source current Lua file', category = 'Misc' },
 }
 
+local default_explanations = require('nvim_game.default_explanations')
+
+-- These two default diagnostic mappings are already present in the curated
+-- Diagnostics category, so enrich those entries instead of asking the same
+-- normal-mode question twice under a second category.
+for _, mapping in ipairs(mappings) do
+  if mapping.key == '[d' or mapping.key == ']d' then
+    local explanation = default_explanations.for_mapping(mapping.key, mapping.desc)
+    mapping.explanation = explanation.why
+    mapping.help = explanation.help
+  end
+end
+
 local config_home = vim.env.XDG_CONFIG_HOME or (vim.env.HOME .. '/.config')
 local compiler_explorer_enabled = vim.env.COMPILER_EXPLORER_URL
   or vim.fn.filereadable(config_home .. '/compiler-explorer-nvim/url') == 1
@@ -216,19 +229,30 @@ local function canonical_key(key)
   end)
   -- Space is the configured leader in this setup, and the game already uses
   -- <leader> as the answer token for it.
-  return key:gsub('<Space>', '<leader>')
+  -- `nvim_get_keymap()` represents a literal Space as either `<Space>` or a
+  -- literal byte depending on the mapping. Answers use the readable leader
+  -- token because this configuration's leader is Space.
+  return key:gsub('<Space>', '<leader>'):gsub(' ', '<leader>')
 end
 
 local known_keys = {}
 for _, mapping in ipairs(mappings) do
-  known_keys[mapping.key] = true
+  -- Most curated keys replace a mapping in every relevant mode.  A key with
+  -- explicit modes only suppresses an identically-mode default: Flash's
+  -- command-line <C-s>, for example, must not hide Neovim's Insert/Select
+  -- signature-help default on the same physical keys.
+  known_keys[mapping.key] = mapping.modes or true
 end
 
 local defaults = {}
 for mode, mode_name in pairs(core_modes) do
   for _, map in ipairs(vim.api.nvim_get_keymap(mode)) do
     local key = canonical_key(map.lhs)
-    if map.sid == -8 and map.desc and not key:match('^<Plug>') and not known_keys[key] then
+    local overridden = known_keys[key]
+    if map.sid == -8
+      and map.desc
+      and not key:match('^<Plug>')
+      and not (overridden == true or (type(overridden) == 'table' and overridden[mode])) then
       local entry = defaults[key]
       if entry then
         entry.modes[#entry.modes + 1] = mode_name
@@ -245,6 +269,12 @@ for mode, mode_name in pairs(core_modes) do
 end
 
 for _, entry in pairs(defaults) do
+  local explanation = default_explanations.for_mapping(entry.key, entry.desc)
+  entry.raw_desc = entry.desc
+  entry.desc = explanation.what
+  entry.explanation = explanation.why
+  entry.help = explanation.help
+  entry.explanation_fallback = explanation.fallback or false
   entry.hint = 'Mode: ' .. table.concat(entry.modes, ' / ')
   entry.modes = nil
   table.insert(mappings, entry)
