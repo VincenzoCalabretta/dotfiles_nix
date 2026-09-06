@@ -153,18 +153,6 @@ local category_cases = {
 			"Breakpoints: 1    Watches: 0",
 		},
 	},
-	Tasks = {
-		title = "Run a task",
-		mode = "normal",
-		prompt = "The task panel contains the project automation tasks.",
-		cursor = 3,
-		lines = {
-			"Overseer tasks",
-			"  build       pending",
-			"▶ test        pending",
-			"  lint        pending",
-		},
-	},
 	Sessions = {
 		title = "Restore or manage a session",
 		mode = "normal",
@@ -297,7 +285,6 @@ local category_actions = {
 	Textobjects = "select",
 	Targets = "target",
 	Debugger = "debug",
-	Tasks = "task",
 	Sessions = "session",
 	AI = "panel",
 	Profiling = "profile",

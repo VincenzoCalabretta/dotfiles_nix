@@ -144,9 +144,7 @@ local mappings = {
   { key = '<M-g>', desc = 'Select debug session', category = 'Debugger' },
   { key = '<M-w>', desc = 'Watch expression under cursor', category = 'Debugger' },
 
-  -- ── Tasks, sessions, AI, and profiling ────────────────────────────────────
-  { key = '<leader>rt', desc = 'Toggle task panel', category = 'Tasks' },
-  { key = '<leader>rr', desc = 'Run task', category = 'Tasks' },
+  -- ── Sessions, AI, and profiling ───────────────────────────────────────────
   { key = '<leader>Ss', desc = 'Restore session for current directory', category = 'Sessions' },
   { key = '<leader>Sl', desc = 'Restore most recent session', category = 'Sessions' },
   { key = '<leader>Sd', desc = 'Stop saving current session', category = 'Sessions' },
