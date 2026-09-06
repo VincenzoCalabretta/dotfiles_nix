@@ -4,6 +4,13 @@ local examples = require("nvim_game.examples")
 local practice = require("nvim_game.practice")
 local game = require("nvim_game")
 
+vim.g.mapleader = " "
+
+local function feed_mapping(key)
+	local keys = key:gsub("<leader>", "<Space>")
+	vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(keys, true, false, true), "x", false)
+end
+
 local missing = examples.coverage(db)
 assert(#missing == 0, table.concat(missing, "\n"))
 
@@ -18,6 +25,7 @@ for _, question in ipairs(db) do
 	assert(#exercise.lines > 0, "empty example for " .. question.key)
 	assert(exercise.cursor >= 1 and exercise.cursor <= #exercise.lines, "invalid cursor for " .. question.key)
 	assert(capture.can_capture(question.key), "uncapturable key: " .. question.key)
+	assert(exercise.action, "missing real-tab action for " .. question.key)
 end
 assert(configured >= 154, "configured bindings unexpectedly disappeared")
 
@@ -48,11 +56,12 @@ vim.api.nvim_buf_call(capture_buf, function()
 end)
 vim.api.nvim_buf_delete(capture_buf, { force = true })
 
--- A correction attempt only completes after the exact sequence.  The bad
--- token is intentionally not forwarded to a real mapping.
+-- The correction drill is an actual tabpage with ordinary source and info
+-- buffers. Its expected key is a real buffer-local mapping, not manual token
+-- comparison in a floating UI.
 local direct_success = false
 assert(practice.observe_ms == 3000)
-practice.observe_ms = 50
+practice.observe_ms = 500
 practice.open({ key = "gd", desc = "Go to definition", category = "Code" }, {
 	wrong_answer = "gr",
 	on_success = function()
@@ -60,20 +69,18 @@ practice.open({ key = "gd", desc = "Go to definition", category = "Code" }, {
 	end,
 })
 assert(practice.active())
+local direct_drill = practice._state_for_test()
+assert(vim.api.nvim_tabpage_is_valid(direct_drill.tab))
+assert(vim.fn.maparg("gd", "n", false, true).buffer == 1)
 assert(
-	table.concat(vim.api.nvim_buf_get_lines(practice._state_for_test().buf, 0, -1, false), "\n")
+	table.concat(vim.api.nvim_buf_get_lines(direct_drill.info_buf, 0, -1, false), "\n")
 		:find("Goal: Go to definition", 1, true)
 )
-practice.handle_key("g")
-assert(practice._state_for_test().input == "g")
-practice.handle_key("x")
-assert(practice._state_for_test().input == "")
-practice.handle_key("g")
-practice.handle_key("d")
+feed_mapping("gd")
 assert(practice._state_for_test().completed)
 assert(
-	table.concat(vim.api.nvim_buf_get_lines(practice._state_for_test().buf, 0, -1, false), "\n")
-		:find("Simulated result: Go to definition", 1, true)
+	table.concat(vim.api.nvim_buf_get_lines(practice._state_for_test().info_buf, 0, -1, false), "\n")
+		:find("Key executed in the correction tab", 1, true)
 )
 assert(
 	vim.wait(1000, function()
@@ -96,11 +103,9 @@ assert(state.q_idx == 1)
 assert(state.wrong == 1)
 assert(#state.questions == original_question_count + 1)
 assert(practice.active())
-for _, token in ipairs(capture.tokens(first.key)) do
-	practice.handle_key(token)
-end
+feed_mapping(first.key)
 assert(
-	vim.wait(1000, function()
+	vim.wait(2000, function()
 		return state.phase == "feedback"
 	end),
 	"game remediation did not finish"

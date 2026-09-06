@@ -1,14 +1,16 @@
--- Foreground, side-effect-free correction exercise for nvim_game.
+-- A real-tab correction drill for nvim_game.
+--
+-- The tab uses ordinary Neovim windows and buffers.  The answer is installed
+-- as a buffer-local mapping on the fixture buffer, so pressing it exercises
+-- Neovim's real mapping machinery while the resulting action stays isolated
+-- from the user's files, Git index, debugger, and external tools.
 
-local capture = require("nvim_game.input")
 local examples = require("nvim_game.examples")
 
 local M = {}
 local NS = vim.api.nvim_create_namespace("nvim_game_practice")
 local P = nil
 
--- Leave the successful simulated result visible long enough to connect the
--- physical key sequence with its effect before returning to the quiz.
 M.observe_ms = 3000
 
 local function setup_hl()
@@ -18,8 +20,6 @@ local function setup_hl()
 		NvimGameExampleText = { fg = "#B8C0D9" },
 		NvimGameExampleCode = { fg = "#9CDCFE" },
 		NvimGameExampleCursor = { fg = "#44FF88", bold = true },
-		NvimGameExampleInput = { fg = "#00CCFF", bold = true },
-		NvimGameExampleError = { fg = "#FF5555", bold = true },
 		NvimGameExampleOk = { fg = "#44FF88", bold = true },
 		NvimGameExampleMuted = { fg = "#777788", italic = true },
 	}
@@ -28,120 +28,150 @@ local function setup_hl()
 	end
 end
 
-local function pad_center(text, width)
-	local left = math.max(0, math.floor((width - vim.fn.strdisplaywidth(text)) / 2))
-	return string.rep(" ", left) .. text
+local function set_lines(buf, lines, modifiable)
+	vim.bo[buf].modifiable = true
+	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+	vim.bo[buf].modifiable = modifiable == true
 end
 
-local function divider(width)
-	return string.rep("─", width)
+local function scratch_buffer(lines, filetype, modifiable)
+	local buf = vim.api.nvim_create_buf(false, true)
+	vim.bo[buf].bufhidden = "wipe"
+	vim.bo[buf].buftype = "nofile"
+	vim.bo[buf].filetype = filetype or "text"
+	set_lines(buf, lines, modifiable)
+	return buf
 end
 
-local function set_buf(lines)
-	vim.bo[P.buf].modifiable = true
-	vim.api.nvim_buf_set_lines(P.buf, 0, -1, false, lines)
-	vim.bo[P.buf].modifiable = false
-end
-
-local function add_hl(line, start_col, end_col, group)
-	pcall(vim.api.nvim_buf_add_highlight, P.buf, NS, group, line, start_col, end_col)
-end
-
-local function truncate(text, width)
-	if vim.fn.strdisplaywidth(text) <= width then
-		return text
+local function info_lines()
+	local example = P.example
+	local lines = {
+		"⌨  CORRECTION DRILL",
+		"",
+		"You answered: " .. (P.wrong_answer ~= "" and P.wrong_answer or "(empty)"),
+		"Correct key: " .. example.key,
+		"",
+		"Goal: " .. example.description,
+		"Context: " .. example.title,
+		"Mode: " .. example.mode,
+		"",
+		"The source window is an editable fixture in this tab.",
+		"Press the displayed key there to run its isolated drill.",
+		"",
+		"<C-c> abandons this game session.",
+	}
+	if P.completed then
+		lines[#lines + 1] = ""
+		lines[#lines + 1] = "✓ Key executed in the correction tab"
+		lines[#lines + 1] = P.outcome
+		lines[#lines + 1] = string.format("Observe the result — returning in %.1f seconds…", P.observe_ms / 1000)
 	end
-	return text:sub(1, math.max(1, width - 1)) .. "…"
+	return lines
 end
 
-local function render()
-	if not (P and vim.api.nvim_buf_is_valid(P.buf)) then
+local function render_info()
+	if not (P and vim.api.nvim_buf_is_valid(P.info_buf)) then
 		return
 	end
-
-	local lines, hls = {}, {}
-	local function add(text, group)
-		lines[#lines + 1] = text
-		if group then
-			hls[#hls + 1] = { #lines - 1, 0, -1, group }
-		end
-	end
-
-	add("", nil)
-	add(pad_center("⌨  CORRECTION EXERCISE", P.width), "NvimGameExampleTitle")
-	add(pad_center("Practice the displayed binding to continue", P.width), "NvimGameExampleMuted")
-	add(divider(P.width), "NvimGameExampleMuted")
-	add("", nil)
-
-	local wrong = P.wrong_answer ~= "" and P.wrong_answer or "(empty)"
-	add(pad_center("You answered: " .. truncate(wrong, P.width - 18), P.width), "NvimGameExampleError")
-	local correct_line = pad_center("Correct key: " .. P.example.key, P.width)
-	add(correct_line, "NvimGameExampleKey")
-	local correct_line_index = #lines - 1
-	local key_start = correct_line:find(P.example.key, 1, true)
-	if key_start then
-		hls[#hls + 1] = { correct_line_index, key_start - 1, key_start - 1 + #P.example.key, "NvimGameExampleKey" }
-	end
-	add("", nil)
-	add(pad_center(P.example.title .. "  ·  " .. P.example.mode, P.width), "NvimGameExampleTitle")
-	add(pad_center(truncate(P.example.prompt, P.width - 4), P.width), "NvimGameExampleText")
-	add(pad_center("Goal: " .. truncate(P.example.description, P.width - 10), P.width), "NvimGameExampleText")
-	add("", nil)
-
-	local content_start = #lines
-	for index, text in ipairs(P.example.lines) do
-		local marker = index == P.example.cursor and "▶ " or "  "
-		add(
-			marker .. truncate(text, P.width - 2),
-			index == P.example.cursor and "NvimGameExampleCursor" or "NvimGameExampleCode"
-		)
-	end
-	local cursor_line = content_start + P.example.cursor - 1
-	if cursor_line >= content_start then
-		hls[#hls + 1] = { cursor_line, 0, 1, "NvimGameExampleCursor" }
-	end
-
-	add("", nil)
-	add(divider(P.width), "NvimGameExampleMuted")
+	set_lines(P.info_buf, info_lines(), false)
+	vim.api.nvim_buf_clear_namespace(P.info_buf, NS, 0, -1)
+	vim.api.nvim_buf_add_highlight(P.info_buf, NS, "NvimGameExampleTitle", 0, 0, -1)
+	vim.api.nvim_buf_add_highlight(P.info_buf, NS, "NvimGameExampleKey", 3, 0, -1)
 	if P.completed then
-		add(pad_center("✓  Correct key accepted — simulated result applied", P.width), "NvimGameExampleOk")
-		add(pad_center(truncate(P.outcome, P.width - 4), P.width), "NvimGameExampleOk")
-		add(
-			pad_center(string.format("Observe the result — returning in %.1f seconds…", P.observe_ms / 1000), P.width),
-			"NvimGameExampleMuted"
-		)
-	else
-		local input = P.input == "" and "▋" or (P.input .. "▋")
-		local input_line = pad_center("Type it: " .. input, P.width)
-		add(input_line, P.message_group or "NvimGameExampleInput")
-		add(
-			pad_center(P.message or "This is a safe simulation; the real mapping will not run.", P.width),
-			P.message and P.message_group or "NvimGameExampleMuted"
-		)
-		add(pad_center("<BS> retry input    <C-c> abandon game", P.width), "NvimGameExampleMuted")
-	end
-
-	set_buf(lines)
-	vim.api.nvim_buf_clear_namespace(P.buf, NS, 0, -1)
-	for _, highlight in ipairs(hls) do
-		add_hl(highlight[1], highlight[2], highlight[3], highlight[4])
+		local first_result_line = #info_lines() - 3
+		vim.api.nvim_buf_add_highlight(P.info_buf, NS, "NvimGameExampleOk", first_result_line, 0, -1)
+		vim.api.nvim_buf_add_highlight(P.info_buf, NS, "NvimGameExampleOk", first_result_line + 1, 0, -1)
+		vim.api.nvim_buf_add_highlight(P.info_buf, NS, "NvimGameExampleMuted", first_result_line + 2, 0, -1)
 	end
 end
 
-function M.close()
+local function abort()
 	if not P then
 		return
 	end
-	local practice = P
-	P = nil
-	if practice.win and vim.api.nvim_win_is_valid(practice.win) then
-		vim.api.nvim_win_close(practice.win, true)
+	local on_abort = P.on_abort
+	M.close()
+	if on_abort then
+		on_abort()
 	end
-	if practice.buf and vim.api.nvim_buf_is_valid(practice.buf) then
-		pcall(vim.api.nvim_buf_delete, practice.buf, { force = true })
+end
+
+local function add_abort_mapping(buf)
+	vim.keymap.set("n", "<C-c>", abort, { buffer = buf, nowait = true, silent = true, desc = "KeyGame: abandon drill" })
+end
+
+local function open_result(title, lines, filetype)
+	if not (P.source_win and vim.api.nvim_win_is_valid(P.source_win)) then
+		return
 	end
-	if practice.parent_win and vim.api.nvim_win_is_valid(practice.parent_win) then
-		pcall(vim.api.nvim_set_current_win, practice.parent_win)
+	vim.api.nvim_set_current_win(P.source_win)
+	vim.cmd("vsplit")
+	P.result_win = vim.api.nvim_get_current_win()
+	P.result_buf = scratch_buffer(vim.list_extend({ title, string.rep("─", 48), "" }, lines), filetype, true)
+	vim.api.nvim_win_set_buf(P.result_win, P.result_buf)
+	vim.wo[P.result_win].number = false
+	vim.wo[P.result_win].relativenumber = false
+	vim.wo[P.result_win].signcolumn = "no"
+	add_abort_mapping(P.result_buf)
+end
+
+local function apply_effect()
+	local example = P.example
+	local action = example.action
+	local source_line = math.min(example.cursor, #example.lines)
+
+	if action == "move" then
+		local destination = source_line == #example.lines and 1 or source_line + 1
+		vim.api.nvim_set_current_win(P.source_win)
+		vim.api.nvim_win_set_cursor(P.source_win, { destination, 0 })
+		P.outcome = string.format("Cursor moved to line %d in the real fixture buffer.", destination)
+	elseif action == "select" then
+		vim.api.nvim_set_current_win(P.source_win)
+		vim.api.nvim_win_set_cursor(P.source_win, { source_line, 0 })
+		vim.cmd("normal! v$")
+		P.outcome = "The selected text is now in Visual mode in the fixture buffer."
+	elseif action == "edit" then
+		local line = vim.api.nvim_buf_get_lines(P.source_buf, source_line - 1, source_line, false)[1]
+		vim.api.nvim_buf_set_lines(P.source_buf, source_line - 1, source_line, false, { line .. "  -- drill applied" })
+		P.outcome = "The fixture source was edited by the exercised mapping."
+	elseif action == "window" then
+		open_result("Window reached by " .. example.key, { "The correction mapping opened this real split.", example.description }, "text")
+		P.outcome = "A real split was opened and focused."
+	elseif action == "diagnostic" then
+		open_result("Diagnostic details", { "Error at the cursor:", example.description, "", "Fix the highlighted expression before continuing." }, "text")
+		P.outcome = "A diagnostic-details buffer was opened beside the fixture."
+	elseif action == "diff" then
+		open_result("Diff for current hunk", {
+			"@@ -12,5 +12,5 @@ function build()",
+			"-return run(target)",
+			"+return run(target, { verbose = true })",
+		}, "diff")
+		P.outcome = "A real diff buffer was opened for the fixture hunk."
+	elseif action == "search" then
+		open_result("Search results", { "src/main.lua:7: " .. example.description, "tests/main_spec.lua:18: matching fixture result" }, "text")
+		P.outcome = "A project-search results buffer was opened."
+	elseif action == "outline" then
+		open_result("Document symbols", { "▾ module nvim_game", "  ▾ function start", "  ▸ function render", "  ▸ function finish" }, "text")
+		P.outcome = "A document-symbol buffer was opened."
+	elseif action == "file" then
+		open_result("Pinned file", { "src/parser.lua", "", "local function parse(input)", "  return input", "end" }, "lua")
+		P.outcome = "The selected pinned-file fixture was opened in a split."
+	elseif action == "definition" or action == "assembly" then
+		open_result("Definition reached by " .. example.key, {
+			"local function calculate_total(items)",
+			"  return vim.iter(items):sum()",
+			"end",
+		}, action == "assembly" and "asm" or "lua")
+		P.outcome = "A definition buffer was opened and focused."
+	elseif action == "debug" then
+		open_result("Debug session", { "Thread 1 paused", "▶ write_result(result)", "", "Stepping state changed by the drill." }, "text")
+		P.outcome = "The debug-session buffer now shows the exercised transition."
+	elseif action == "target" or action == "task" then
+		open_result("Task output", { "$ " .. example.description, "", "fixture action completed successfully" }, "text")
+		P.outcome = "A task-output buffer was opened for the selected action."
+	else
+		open_result("Result of " .. example.key, { example.description, "", "This action ran inside the isolated correction tab." }, "text")
+		P.outcome = "A real result buffer was opened for the exercised action."
 	end
 end
 
@@ -150,11 +180,8 @@ local function complete()
 		return
 	end
 	P.completed = true
-	P.message = nil
-	P.outcome = "Simulated result: " .. P.example.description
-	P.example.prompt = "The shown mapping was captured; its safe simulated result is now visible."
-	P.example.lines[P.example.cursor] = P.example.lines[P.example.cursor] .. "  ← simulated effect"
-	render()
+	apply_effect()
+	render_info()
 	local finished = P
 	vim.defer_fn(function()
 		if P ~= finished then
@@ -168,45 +195,21 @@ local function complete()
 	end, P.observe_ms)
 end
 
-function M.handle_key(action)
-	if not P or P.completed then
+function M.close()
+	if not P then
 		return
 	end
-
-	if action == "__quit__" then
-		local on_abort = P.on_abort
-		M.close()
-		if on_abort then
-			on_abort()
-		end
-		return
+	local drill = P
+	P = nil
+	if drill.tab and vim.api.nvim_tabpage_is_valid(drill.tab) then
+		pcall(vim.api.nvim_set_current_tabpage, drill.tab)
+		pcall(vim.cmd, "tabclose!")
 	end
-	if action == "__bs__" then
-		P.input = capture.backspace(P.input)
-		P.message, P.message_group = nil, nil
-		render()
-		return
+	if drill.parent_tab and vim.api.nvim_tabpage_is_valid(drill.parent_tab) then
+		pcall(vim.api.nvim_set_current_tabpage, drill.parent_tab)
 	end
-	if action == "__submit__" then
-		P.message = "Type the displayed key sequence; <Enter> is not required."
-		P.message_group = "NvimGameExampleMuted"
-		render()
-		return
-	end
-
-	local candidate = capture.append(P.input, action)
-	if candidate == P.example.key then
-		P.input = candidate
-		complete()
-	elseif capture.is_prefix(candidate, P.example.key) then
-		P.input = candidate
-		P.message, P.message_group = nil, nil
-		render()
-	else
-		P.input = ""
-		P.message = "That sequence does not match. Try the shown key again."
-		P.message_group = "NvimGameExampleError"
-		render()
+	if drill.parent_win and vim.api.nvim_win_is_valid(drill.parent_win) then
+		pcall(vim.api.nvim_set_current_win, drill.parent_win)
 	end
 end
 
@@ -214,56 +217,65 @@ function M.open(question, options)
 	M.close()
 	setup_hl()
 	options = options or {}
-	local width = math.max(40, math.min(94, vim.o.columns - 4))
-	local height = math.max(14, math.min(28, vim.o.lines - 4))
-	local buf = vim.api.nvim_create_buf(false, true)
-	vim.bo[buf].bufhidden = "wipe"
-	vim.bo[buf].buftype = "nofile"
-	vim.bo[buf].filetype = "nvimgameexample"
-	vim.bo[buf].modifiable = false
+	local parent_tab = vim.api.nvim_get_current_tabpage()
+	local parent_win = options.parent_win or vim.api.nvim_get_current_win()
 
-	local win = vim.api.nvim_open_win(buf, true, {
-		relative = "editor",
-		width = width,
-		height = height,
-		col = math.max(0, math.floor((vim.o.columns - width) / 2)),
-		row = math.max(0, math.floor((vim.o.lines - height) / 2)),
-		style = "minimal",
-		border = "rounded",
-		title = "  Practice the correct key  ",
-		title_pos = "center",
-		zindex = 310,
-	})
-	vim.wo[win].cursorline = false
-	vim.wo[win].wrap = false
-	vim.wo[win].signcolumn = "no"
-
+	vim.cmd("tabnew")
+	local source_win = vim.api.nvim_get_current_win()
+	local source_buf = vim.api.nvim_get_current_buf()
+	local example = examples.resolve(question)
 	P = {
-		buf = buf,
-		win = win,
-		parent_win = options.parent_win,
-		width = width,
-		example = examples.resolve(question),
+		tab = vim.api.nvim_get_current_tabpage(),
+		parent_tab = parent_tab,
+		parent_win = parent_win,
+		source_win = source_win,
+		source_buf = source_buf,
+		example = example,
 		wrong_answer = options.wrong_answer or "",
-		input = "",
-		message = nil,
-		message_group = nil,
 		completed = false,
 		outcome = nil,
 		observe_ms = options.observe_ms or M.observe_ms,
 		on_success = options.on_success,
 		on_abort = options.on_abort,
 	}
-	capture.setup(buf, M.handle_key)
-	render()
-	return buf, win
+
+	vim.bo[source_buf].bufhidden = "wipe"
+	vim.bo[source_buf].buftype = "nofile"
+	vim.bo[source_buf].filetype = example.action == "diff" and "diff" or "lua"
+	set_lines(source_buf, example.lines, true)
+	vim.wo[source_win].number = true
+	vim.wo[source_win].relativenumber = true
+	vim.api.nvim_win_set_cursor(source_win, { math.min(example.cursor, #example.lines), 0 })
+	vim.api.nvim_buf_clear_namespace(source_buf, NS, 0, -1)
+	vim.api.nvim_buf_add_highlight(source_buf, NS, "NvimGameExampleCursor", example.cursor - 1, 0, -1)
+
+	vim.cmd("vsplit")
+	P.info_win = vim.api.nvim_get_current_win()
+	P.info_buf = scratch_buffer({}, "nvimgameinfo", false)
+	vim.api.nvim_win_set_buf(P.info_win, P.info_buf)
+	vim.api.nvim_win_set_width(P.info_win, math.min(42, math.floor(vim.o.columns / 2)))
+	vim.wo[P.info_win].number = false
+	vim.wo[P.info_win].relativenumber = false
+	vim.wo[P.info_win].signcolumn = "no"
+	vim.wo[P.info_win].wrap = true
+	add_abort_mapping(P.info_buf)
+
+	vim.api.nvim_set_current_win(source_win)
+	vim.keymap.set("n", example.key, complete, {
+		buffer = source_buf,
+		nowait = true,
+		silent = true,
+		desc = "KeyGame: run correction drill",
+	})
+	add_abort_mapping(source_buf)
+	render_info()
+	return source_buf, source_win
 end
 
 function M.active()
 	return P ~= nil
 end
 
--- Internal inspection hooks used by the headless regression test.
 function M._state_for_test()
 	return P
 end

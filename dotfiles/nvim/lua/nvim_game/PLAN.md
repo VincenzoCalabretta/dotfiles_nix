@@ -59,16 +59,17 @@ memory yet (see planned features).
 
 ### Correction exercises
 
-Submitting a wrong answer now opens a dedicated foreground scratch buffer.
-It renders a contextual fixture for the missed mapping (source, a diagnostic,
-a Git hunk, an outline, a debugger state, and so on) and prominently displays
-the correct key. The user must type that exact physical key sequence before
-the game can continue. The buffer captures the sequence with its own
-buffer-local mappings: it **never executes the configured mapping**, so drills
-remain safe for actions that would stage a hunk, run a target, or change an
-external tool's state. A successful sequence applies a visible simulated
-result in the scratch buffer and leaves it focused for three seconds before
-the game advances, so the user can observe the effect in a real Neovim window.
+Submitting a wrong answer now opens a dedicated Neovim **tab page** with an
+editable source fixture and an information buffer beside it. It renders a
+context for the missed mapping (source, a diagnostic, a Git hunk, an outline,
+a debugger state, and so on) and prominently displays the correct key. The
+user must invoke that exact physical key sequence in the source buffer before
+the game can continue. The expected sequence is a real buffer-local Neovim
+mapping: it opens actual result buffers/splits, moves the cursor, selects text,
+or edits the fixture according to the exercise. These actions remain isolated
+from the user's files, Git index, debugger, and external tools. The tab stays
+open for three seconds after success so the user can inspect the effect before
+the game advances.
 
 `examples.lua` resolves an exercise for every database entry. The 154 curated
 bindings have category-specific fixtures, the optional Compiler Explorer

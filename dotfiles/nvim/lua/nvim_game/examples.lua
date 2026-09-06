@@ -286,6 +286,27 @@ local core_cases = {
 	},
 }
 
+local category_actions = {
+	Code = "definition",
+	Diagnostics = "diagnostic",
+	Git = "diff",
+	Search = "search",
+	Harpoon = "file",
+	Outline = "outline",
+	Navigation = "move",
+	Textobjects = "select",
+	Targets = "target",
+	Debugger = "debug",
+	Tasks = "task",
+	Sessions = "session",
+	AI = "panel",
+	Profiling = "profile",
+	KeyGame = "menu",
+	Windows = "window",
+	Misc = "edit",
+	["Compiler Explorer"] = "assembly",
+}
+
 local function core_case(question)
 	local hint = question.hint or ""
 	local template
@@ -327,6 +348,7 @@ function M.resolve(question)
 	result.key = question.key
 	result.description = question.desc
 	result.category = question.category
+	result.action = question.category == "Neovim defaults" and "default" or category_actions[question.category]
 	result.exercise_id = question.category == "Neovim defaults" and ("core:" .. question.key)
 		or (question.category .. ":" .. question.key)
 	return result
