@@ -51,6 +51,8 @@ vim.api.nvim_buf_delete(capture_buf, { force = true })
 -- A correction attempt only completes after the exact sequence.  The bad
 -- token is intentionally not forwarded to a real mapping.
 local direct_success = false
+assert(practice.observe_ms == 3000)
+practice.observe_ms = 50
 practice.open({ key = "gd", desc = "Go to definition", category = "Code" }, {
 	wrong_answer = "gr",
 	on_success = function()
@@ -68,6 +70,11 @@ practice.handle_key("x")
 assert(practice._state_for_test().input == "")
 practice.handle_key("g")
 practice.handle_key("d")
+assert(practice._state_for_test().completed)
+assert(
+	table.concat(vim.api.nvim_buf_get_lines(practice._state_for_test().buf, 0, -1, false), "\n")
+		:find("Simulated result: Go to definition", 1, true)
+)
 assert(
 	vim.wait(1000, function()
 		return direct_success
@@ -109,5 +116,6 @@ assert(state.phase == "feedback")
 game.handle_key("__quit__")
 assert(state.buf == nil)
 assert(not practice.active())
+practice.observe_ms = 3000
 
 print("nvim_game: ok")

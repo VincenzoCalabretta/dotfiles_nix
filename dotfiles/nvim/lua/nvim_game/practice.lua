@@ -7,6 +7,10 @@ local M = {}
 local NS = vim.api.nvim_create_namespace("nvim_game_practice")
 local P = nil
 
+-- Leave the successful simulated result visible long enough to connect the
+-- physical key sequence with its effect before returning to the quiz.
+M.observe_ms = 3000
+
 local function setup_hl()
 	local groups = {
 		NvimGameExampleTitle = { fg = "#FFD700", bold = true },
@@ -100,7 +104,12 @@ local function render()
 	add("", nil)
 	add(divider(P.width), "NvimGameExampleMuted")
 	if P.completed then
-		add(pad_center("✓  Correct key practiced — returning to the game…", P.width), "NvimGameExampleOk")
+		add(pad_center("✓  Correct key accepted — simulated result applied", P.width), "NvimGameExampleOk")
+		add(pad_center(truncate(P.outcome, P.width - 4), P.width), "NvimGameExampleOk")
+		add(
+			pad_center(string.format("Observe the result — returning in %.1f seconds…", P.observe_ms / 1000), P.width),
+			"NvimGameExampleMuted"
+		)
 	else
 		local input = P.input == "" and "▋" or (P.input .. "▋")
 		local input_line = pad_center("Type it: " .. input, P.width)
@@ -142,6 +151,9 @@ local function complete()
 	end
 	P.completed = true
 	P.message = nil
+	P.outcome = "Simulated result: " .. P.example.description
+	P.example.prompt = "The shown mapping was captured; its safe simulated result is now visible."
+	P.example.lines[P.example.cursor] = P.example.lines[P.example.cursor] .. "  ← simulated effect"
 	render()
 	local finished = P
 	vim.defer_fn(function()
@@ -153,7 +165,7 @@ local function complete()
 		if on_success then
 			on_success()
 		end
-	end, 350)
+	end, P.observe_ms)
 end
 
 function M.handle_key(action)
@@ -237,6 +249,8 @@ function M.open(question, options)
 		message = nil,
 		message_group = nil,
 		completed = false,
+		outcome = nil,
+		observe_ms = options.observe_ms or M.observe_ms,
 		on_success = options.on_success,
 		on_abort = options.on_abort,
 	}

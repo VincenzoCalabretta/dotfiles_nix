@@ -66,7 +66,9 @@ the correct key. The user must type that exact physical key sequence before
 the game can continue. The buffer captures the sequence with its own
 buffer-local mappings: it **never executes the configured mapping**, so drills
 remain safe for actions that would stage a hunk, run a target, or change an
-external tool's state.
+external tool's state. A successful sequence applies a visible simulated
+result in the scratch buffer and leaves it focused for three seconds before
+the game advances, so the user can observe the effect in a real Neovim window.
 
 `examples.lua` resolves an exercise for every database entry. The 154 curated
 bindings have category-specific fixtures, the optional Compiler Explorer
