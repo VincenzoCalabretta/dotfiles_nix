@@ -100,11 +100,5 @@ return {
     config = function()
       require("telescope").load_extension("dap")
     end,
-    keys = {
-      { "<leader>dfc", "<cmd>Telescope dap commands<cr>",         desc = "DAP Commands"    },
-      { "<leader>dfb", "<cmd>Telescope dap list_breakpoints<cr>", desc = "DAP Breakpoints" },
-      { "<leader>dfv", "<cmd>Telescope dap variables<cr>",        desc = "DAP Variables"   },
-      { "<leader>dff", "<cmd>Telescope dap frames<cr>",           desc = "DAP Frames"      },
-    },
   },
 }

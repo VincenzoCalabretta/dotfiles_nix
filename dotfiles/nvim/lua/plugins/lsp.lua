@@ -36,14 +36,14 @@ return {
           -- to a gtags query when the client has no results (or no client
           -- is attached at all) -- see that file for why.
           map('gI', require('telescope.builtin').lsp_implementations, '[G]oto [I]mplementation')
-          map('<leader>D', require('telescope.builtin').lsp_type_definitions, 'Type [D]efinition')
-          map('<leader>ds', require('telescope.builtin').lsp_document_symbols, '[D]ocument [S]ymbols')
-          map('<leader>ws', require('telescope.builtin').lsp_dynamic_workspace_symbols, '[W]orkspace [S]ymbols')
-          map('<leader>rn', vim.lsp.buf.rename, '[R]e[n]ame')
+          map('<leader>ct', require('telescope.builtin').lsp_type_definitions, '[C]ode [T]ype definition')
+          map('<leader>cd', require('telescope.builtin').lsp_document_symbols, '[C]ode [D]ocument symbols')
+          map('<leader>cw', require('telescope.builtin').lsp_dynamic_workspace_symbols, '[C]ode [W]orkspace symbols')
+          map('<leader>cr', vim.lsp.buf.rename, '[C]ode [R]ename')
           map('<leader>ca', vim.lsp.buf.code_action, '[C]ode [A]ction')
           map('K', vim.lsp.buf.hover, 'Hover Documentation')
           map('gD', vim.lsp.buf.declaration, '[G]oto [D]eclaration')
-          map('<leader>f', vim.lsp.buf.format, '[F]ormat current buffer')
+          map('<leader>cf', vim.lsp.buf.format, '[C]ode [F]ormat current buffer')
 
           local client = vim.lsp.get_client_by_id(event.data.client_id)
 
@@ -72,9 +72,9 @@ return {
           end
 
           if client and client.server_capabilities.inlayHintProvider and vim.lsp.inlay_hint then
-            map('<leader>th', function()
+            map('<leader>ch', function()
               vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled())
-            end, '[T]oggle Inlay [H]ints')
+            end, '[C]ode toggle inlay [H]ints')
           end
 
           if client and client.supports_method('textDocument/codeLens') then

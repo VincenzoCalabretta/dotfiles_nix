@@ -11,7 +11,7 @@ lua/nvim_game/
   PLAN.md     this file
 
 lua/plugins/
-  nvim_game.lua   lazy.nvim spec (<leader>G to launch)
+  nvim_game.lua   lazy.nvim spec (<leader>Gm to launch)
 ```
 
 The plugin is a pure-Lua, zero-dependency floating-window game.
@@ -104,7 +104,7 @@ Special tokens:
 
 - **Window resize**: The floating window position is computed once at open
   time. Resizing the terminal while the game is open will leave the window
-  misaligned. Workaround: close and reopen with `<leader>G`.
+  misaligned. Workaround: close and reopen with `<leader>Gm`.
 
 - **Highlight offsets**: `find_hl` uses byte offsets but `strdisplaywidth`
   uses display cells. For pure ASCII content this is identical. Any entry

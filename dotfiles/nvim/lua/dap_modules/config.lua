@@ -240,9 +240,8 @@ function M.setup(bazel)
   end, { desc = "Show trace timeline (pause target first)" })
 
   -- ── Remote SSH deploy + debug ──────────────────────────────────────────────
-  -- <leader>gd is the C++ shortcut (see plugins/dap.lua); this command covers
-  -- Rust too and is the only entry point exposed for it since a second
-  -- dedicated keybinding wasn't worth the mnemonic clash with <leader>gr/gR.
+  -- <leader>bH is the C++ shortcut (see plugins/dap.lua). This command also
+  -- exposes the remote Rust flow without adding another leader mapping.
   vim.api.nvim_create_user_command("DapRemoteDebug", function(o)
     local lang = o.args ~= "" and o.args or "cpp"
     require("dap_modules.remote").launch(lang)

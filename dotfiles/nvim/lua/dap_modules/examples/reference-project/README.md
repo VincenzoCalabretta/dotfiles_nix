@@ -24,13 +24,13 @@ cd dap_modules/examples/reference-project
 nvim cpp/hello_debug.cc
 ```
 
-- `<leader>gc` → Telescope picker → `//cpp:hello_debug` → attaches gdb.
+- `<leader>bC` → Telescope picker → `//cpp:hello_debug` → attaches gdb.
   Set a breakpoint on the `squared = counter * counter` line (`<M-b>`),
   `<M-c>` to continue, watch `counter` change on each hit.
-- `<leader>gp` → Telescope picker → `//python:hello_debug` → attaches via
+- `<leader>bp` → Telescope picker → `//python:hello_debug` → attaches via
   debugpy (requires `pip install debugpy` on whatever `python3` `.bazelrc`'s
   `debugpy` config resolves to on your `PATH`).
-- `<leader>gl` re-launches whichever of the two ran last.
+- `<leader>bl` re-launches whichever of the two ran last.
 
 Both binaries loop forever, deliberately slowly (`sleep(500ms)`/
 `sleep_for(500ms)`), printing each iteration — there's no race to attach
@@ -73,8 +73,8 @@ monorepos that debug over `gdbserver`/`debugpy`:
 These are exactly `dap_modules`' built-in defaults (`project.lua`), so if
 your own monorepo already has `.bazelrc` configs with these names and ports
 (many do, independently — it's a natural convention), **no `.nvim-dap.lua`
-is needed at all**: open Neovim at that repo's root and `<leader>gc`/
-`<leader>gp` work immediately.
+is needed at all**: open Neovim at that repo's root and `<leader>bC`/
+`<leader>bp` work immediately.
 
 For remote/cross-compiled boards, the commented-out `remote-arm64` config in
 this project's `.bazelrc` is the shape to copy: a `build:<name>` config that

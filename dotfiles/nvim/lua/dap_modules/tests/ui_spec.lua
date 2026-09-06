@@ -40,15 +40,8 @@ describe("dap_modules.ui", function()
       assert.same({ "nvim-telescope/telescope.nvim" }, spec.dependencies)
     end)
 
-    it("maps all four DAP telescope pickers under <leader>df", function()
-      local mapped = {}
-      for _, key in ipairs(spec.keys) do
-        mapped[key[1]] = key[2]
-      end
-      assert.equals("<cmd>Telescope dap commands<cr>", mapped["<leader>dfc"])
-      assert.equals("<cmd>Telescope dap list_breakpoints<cr>", mapped["<leader>dfb"])
-      assert.equals("<cmd>Telescope dap variables<cr>", mapped["<leader>dfv"])
-      assert.equals("<cmd>Telescope dap frames<cr>", mapped["<leader>dff"])
+    it("does not own leader mappings", function()
+      assert.is_nil(spec.keys)
     end)
   end)
 end)

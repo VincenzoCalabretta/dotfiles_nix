@@ -6,11 +6,11 @@
 -- `-interpreter-exec console "..."` must NOT be used here — it is MI-only.
 --
 -- Workflow:
---   1. Session connected and paused (after <leader>gs)
---   2. <leader>gtt  — place tracepoint on function under cursor
---   3. <leader>gts  — tstart, then <M-c> to resume and log hits non-intrusively
+--   1. Session connected and paused (after <leader>bg)
+--   2. <leader>bT  — choose “Set tracepoint at cursor”
+--   3. <leader>bT  — choose “Start collection”, then <M-c> to resume
 --   4. <M-p>        — pause the target (GDB requires this before tstop/tfind)
---   5. <leader>gtv  — tstop + collect all frames → timeline buffer
+--   5. <leader>bT  — choose “Show timeline”
 --
 -- Every tracepoint collects the target's $trace_timestamp trace-state
 -- variable. GNU gdbserver supplies it in microseconds; an unsupported target
@@ -176,7 +176,7 @@ function M.set(location)
     else
       place_marker(session, marker)
       vim.notify("[Trace] Tracepoint set: " .. location
-                 .. " (timestamp collection enabled)  →  <leader>gts to start collection",
+                 .. " (timestamp collection enabled)  →  <leader>bT to start collection",
                  vim.log.levels.INFO)
     end
   end)
@@ -189,7 +189,7 @@ function M.tstart()
     if err then
       vim.notify("[Trace] tstart failed: " .. (err.message or vim.inspect(err)), vim.log.levels.ERROR)
     else
-      vim.notify("[Trace] Collection started  →  <M-c> to run; <M-p>, then <leader>gtv to view",
+      vim.notify("[Trace] Collection started  →  <M-c> to run; <M-p>, then <leader>bT to view",
                  vim.log.levels.INFO)
     end
   end)
@@ -203,7 +203,7 @@ function M.tstop()
     return
   end
   gdb(session, "tstop", function()
-    vim.notify("[Trace] Stopped  →  <leader>gtv to view", vim.log.levels.INFO)
+    vim.notify("[Trace] Stopped  →  <leader>bT to view", vim.log.levels.INFO)
   end)
 end
 
@@ -284,8 +284,8 @@ local function render(session_name, frames, truncated)
   if #frames == 0 then
     table.insert(lines, "")
     table.insert(lines, "  No frames collected.")
-    table.insert(lines, "  ● Was a tracepoint set?          :DapTraceInfo  (or <leader>gti)")
-    table.insert(lines, "  ● Was collection started?        :DapTraceStart (or <leader>gts)")
+    table.insert(lines, "  ● Was a tracepoint set?          :DapTraceInfo  (or <leader>bT)")
+    table.insert(lines, "  ● Was collection started?        :DapTraceStart (or <leader>bT)")
     table.insert(lines, "  ● Does this gdbserver support tracepoints? Check the REPL for errors.")
   else
     local has_ts = frames[1].ts ~= 0

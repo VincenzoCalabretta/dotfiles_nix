@@ -337,7 +337,7 @@ end
 function M.launch_last()
   local data = M.load_last_target()
   if not data or not data.target or data.target == "" then
-    print("No previous target found. Use <leader>gc/gp/gr/gd to select one first.")
+    print("No previous target found. Use <leader>bC/bp/bu/bH to select one first.")
     return
   end
   print(string.format("Relaunching last target (%s): %s", data.lang, data.target))

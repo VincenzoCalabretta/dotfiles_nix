@@ -24,7 +24,7 @@ run:debugpy --run_under="python3 -m debugpy --listen 0.0.0.0:5678 --wait-for-cli
 # no `run_under` here, since remote.lua starts gdbserver itself once the
 # binary has been rsynced to the target. Uncomment and point
 # --platforms/--extra_toolchains at your own registered cross-toolchain to
-# use <leader>gd / :DapRemoteDebug against a real board.
+# use <leader>bH / :DapRemoteDebug against a real board.
 #
 # build:remote-arm64 --platforms=//platforms:arm64-linux
 # build:remote-arm64 --compilation_mode=dbg

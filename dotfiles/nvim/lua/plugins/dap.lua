@@ -2,6 +2,48 @@
 
 local ui = require("dap_modules.ui")
 
+local function dap_picker_menu()
+  local choices = {
+    { label = "Commands", command = "Telescope dap commands" },
+    { label = "Breakpoints", command = "Telescope dap list_breakpoints" },
+    { label = "Variables", command = "Telescope dap variables" },
+    { label = "Stack frames", command = "Telescope dap frames" },
+  }
+
+  vim.ui.select(choices, {
+    prompt = "DAP picker:",
+    format_item = function(choice) return choice.label end,
+  }, function(choice)
+    if choice then vim.cmd(choice.command) end
+  end)
+end
+
+local function trace_menu()
+  local trace = require("dap_modules.trace")
+  local choices = {
+    { label = "Set tracepoint at cursor", action = trace.set },
+    {
+      label = "Set tracepoint at location…",
+      action = function()
+        vim.ui.input({ prompt = "Tracepoint location (func or file:line): " }, function(location)
+          if location and location ~= "" then trace.set(location) end
+        end)
+      end,
+    },
+    { label = "Start collection", action = trace.tstart },
+    { label = "Show timeline", action = trace.show },
+    { label = "Clear tracepoints", action = trace.clear },
+    { label = "Show tracepoint information", action = trace.info },
+  }
+
+  vim.ui.select(choices, {
+    prompt = "Tracepoint action:",
+    format_item = function(choice) return choice.label end,
+  }, function(choice)
+    if choice then choice.action() end
+  end)
+end
+
 local core = {
   "mfussenegger/nvim-dap",
   dependencies = {
@@ -103,98 +145,51 @@ local core = {
       desc = "DAP: Add Watch (cexpr under cursor)",
     },
 
-    -- ── Tracepoint timeline: <leader>gt prefix ───────────────────────────────
-    -- Workflow: gtt (set) → gts (start collection) → <M-c> (run) →
-    -- <M-p> (pause) → gtv (stop collection + show timeline).
+    -- ── Build / target lifecycle: flat <leader>b bindings ────────────────────
+    -- Keep each action at two keys after <leader>; menus replace nested trees.
     {
-      "<leader>gtt",
-      function() require("dap_modules.trace").set() end,
-      desc = "Trace: set tracepoint at <cword>",
-    },
-    {
-      "<leader>gtT",
-      function()
-        vim.ui.input({ prompt = "Tracepoint location (func or file:line): " }, function(loc)
-          if loc and loc ~= "" then require("dap_modules.trace").set(loc) end
-        end)
-      end,
-      desc = "Trace: set tracepoint (prompt)",
-    },
-    {
-      "<leader>gts",
-      function() require("dap_modules.trace").tstart() end,
-      desc = "Trace: start collection (tstart)",
-    },
-    {
-      "<leader>gtv",
-      function() require("dap_modules.trace").show() end,
-      desc = "Trace: show timeline (pause target first)",
-    },
-    {
-      "<leader>gtc",
-      function() require("dap_modules.trace").clear() end,
-      desc = "Trace: clear all tracepoints",
-    },
-    {
-      "<leader>gti",
-      function() require("dap_modules.trace").info() end,
-      desc = "Trace: info tracepoints (REPL)",
-    },
-
-    -- ── Launchers / view: <leader>g prefix ────────────────────────────────────
-    -- Note: if <leader>g is already used for git, remap these to <leader>X of
-    -- your choice (safe letters: h, j, k, m, q, z).
-
-    { "<leader>gv", "<cmd>DapViewOpen<cr>",  desc = "DAP: Open View"  },
-    { "<leader>gV", "<cmd>DapViewClose<cr>", desc = "DAP: Close View" },
-
-    -- Dual gdbserver attach
-    {
-      "<leader>gs",
+      "<leader>bg",
       function() require("dap_modules.bazel").connect_dual() end,
       desc = "DAP: Attach to dual gdbservers (:1234 + :1235)",
     },
-
-    -- C++
     {
-      "<leader>gc",
+      "<leader>bC",
       function() require("dap_modules.bazel").launch_test() end,
       desc = "DAP: Debug C++ Target (Telescope)",
     },
     {
-      "<leader>gl",
+      "<leader>bH",
+      function() require("dap_modules.remote").launch("cpp") end,
+      desc = "DAP: Deploy & Debug Remote C++ Target (SSH)",
+    },
+    {
+      "<leader>bl",
       function() require("dap_modules.bazel").launch_last() end,
       desc = "DAP: Relaunch Last Target",
     },
     {
-      "<leader>gd",
-      function() require("dap_modules.remote").launch("cpp") end,
-      desc = "DAP: Deploy & Debug Remote C++ Target (SSH)",
-    },
-
-    -- Python
-    {
-      "<leader>gp",
+      "<leader>bp",
       function() require("dap_modules.bazel").launch_python() end,
       desc = "DAP: Debug Python Target (Telescope)",
     },
     {
-      "<leader>gP",
+      "<leader>bP",
       function() require("dap_modules.bazel").launch_python_simple() end,
       desc = "DAP: Debug Python Target (input)",
     },
-
-    -- Rust
     {
-      "<leader>gr",
+      "<leader>bu",
       function() require("dap_modules.bazel").launch_rust() end,
       desc = "DAP: Debug Rust Target (Telescope)",
     },
     {
-      "<leader>gR",
+      "<leader>bU",
       function() require("dap_modules.bazel").launch_rust_simple() end,
       desc = "DAP: Debug Rust Target (input)",
     },
+    { "<leader>bv", "<cmd>DapViewToggle<cr>", desc = "DAP: Toggle View" },
+    { "<leader>bT", trace_menu, desc = "DAP: Tracepoint Actions" },
+    { "<leader>b?", dap_picker_menu, desc = "DAP: Open Picker Menu" },
   },
 
   config = function()

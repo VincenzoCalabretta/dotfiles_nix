@@ -26,27 +26,27 @@ return {
   -- },
   
   keys = {
-    -- Toggle aerial window
-    { "<leader>a", "<cmd>AerialToggle!<CR>", desc = "Aerial: Toggle" },
-    { "<leader>ao", "<cmd>AerialOpen<CR>", desc = "Aerial: Open" },
-    { "<leader>ac", "<cmd>AerialClose<CR>", desc = "Aerial: Close" },
-    { "<leader>aO", "<cmd>AerialOpenAll<CR>", desc = "Aerial: Open All" },
-    { "<leader>aC", "<cmd>AerialCloseAll<CR>", desc = "Aerial: Close All" },
+    -- Outline actions: no standalone <leader>o map, so mappings do not timeout.
+    { "<leader>ot", "<cmd>AerialToggle!<CR>", desc = "Outline: Toggle" },
+    { "<leader>oo", "<cmd>AerialOpen<CR>", desc = "Outline: Open" },
+    { "<leader>oc", "<cmd>AerialClose<CR>", desc = "Outline: Close" },
+    { "<leader>oO", "<cmd>AerialOpenAll<CR>", desc = "Outline: Open All" },
+    { "<leader>oC", "<cmd>AerialCloseAll<CR>", desc = "Outline: Close All" },
     
     -- Navigation
-    { "<leader>an", "<cmd>AerialNext<CR>", desc = "Aerial: Next Symbol" },
-    { "<leader>ap", "<cmd>AerialPrev<CR>", desc = "Aerial: Prev Symbol" },
-    { "<leader>ag", "<cmd>AerialGo<CR>", desc = "Aerial: Go to Symbol" },
+    { "<leader>on", "<cmd>AerialNext<CR>", desc = "Outline: Next Symbol" },
+    { "<leader>op", "<cmd>AerialPrev<CR>", desc = "Outline: Prev Symbol" },
+    { "<leader>og", "<cmd>AerialGo<CR>", desc = "Outline: Go to Symbol" },
     
     -- Nav window
-    { "<leader>aN", "<cmd>AerialNavToggle<CR>", desc = "Aerial: Toggle Nav Window" },
+    { "<leader>oN", "<cmd>AerialNavToggle<CR>", desc = "Outline: Toggle Nav Window" },
     
     -- Info
-    { "<leader>ai", "<cmd>AerialInfo<CR>", desc = "Aerial: Info" },
+    { "<leader>oi", "<cmd>AerialInfo<CR>", desc = "Outline: Info" },
     
     -- Telescope integration (if available)
     {
-      "<leader>as",
+      "<leader>os",
       function()
         if pcall(require, "telescope") then
           require("telescope").extensions.aerial.aerial()
@@ -54,12 +54,12 @@ return {
           vim.notify("Telescope not available", vim.log.levels.WARN)
         end
       end,
-      desc = "Aerial: Search Symbols (Telescope)",
+      desc = "Outline: Search Symbols (Telescope)",
     },
     
     -- FZF-Lua integration (if available)
     {
-      "<leader>af",
+      "<leader>of",
       function()
         if pcall(require, "fzf-lua") then
           require("aerial").fzf_lua_picker()
@@ -67,12 +67,12 @@ return {
           vim.notify("FZF-Lua not available", vim.log.levels.WARN)
         end
       end,
-      desc = "Aerial: Search Symbols (FZF-Lua)",
+      desc = "Outline: Search Symbols (FZF-Lua)",
     },
     
     -- Snacks picker integration (if available)
     {
-      "<leader>aS",
+      "<leader>oS",
       function()
         if pcall(require, "snacks") then
           require("aerial").snacks_picker()
@@ -80,7 +80,7 @@ return {
           vim.notify("Snacks.nvim not available", vim.log.levels.WARN)
         end
       end,
-      desc = "Aerial: Search Symbols (Snacks)",
+      desc = "Outline: Search Symbols (Snacks)",
     },
   },
   
@@ -225,10 +225,10 @@ return {
     -- Callback when aerial attaches to a buffer
     on_attach = function(bufnr)
       -- Set buffer-local keymaps for navigation
-      vim.keymap.set("n", "{", "<cmd>AerialPrev<CR>", { buffer = bufnr, desc = "Aerial: Prev Symbol" })
-      vim.keymap.set("n", "}", "<cmd>AerialNext<CR>", { buffer = bufnr, desc = "Aerial: Next Symbol" })
-      vim.keymap.set("n", "[[", "<cmd>AerialPrevUp<CR>", { buffer = bufnr, desc = "Aerial: Prev Up" })
-      vim.keymap.set("n", "]]", "<cmd>AerialNextUp<CR>", { buffer = bufnr, desc = "Aerial: Next Up" })
+      vim.keymap.set("n", "[o", "<cmd>AerialPrev<CR>", { buffer = bufnr, desc = "Outline: Prev Symbol" })
+      vim.keymap.set("n", "]o", "<cmd>AerialNext<CR>", { buffer = bufnr, desc = "Outline: Next Symbol" })
+      vim.keymap.set("n", "[O", "<cmd>AerialPrevUp<CR>", { buffer = bufnr, desc = "Outline: Prev Up" })
+      vim.keymap.set("n", "]O", "<cmd>AerialNextUp<CR>", { buffer = bufnr, desc = "Outline: Next Up" })
     end,
     
     -- Callback when symbols are first set

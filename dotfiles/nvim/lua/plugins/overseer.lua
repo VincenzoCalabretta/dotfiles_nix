@@ -87,8 +87,8 @@ return {
       --   end,
       -- })
 
-      vim.keymap.set("n", "<leader>o", "<cmd>OverseerToggle<CR>", { desc = "Toggle Overseer UI" })
-      vim.keymap.set("n", "<leader>or", "<cmd>OverseerRun<CR>", { desc = "Run Overseer Task" })
+      vim.keymap.set("n", "<leader>rt", "<cmd>OverseerToggle<CR>", { desc = "Tasks: Toggle Overseer UI" })
+      vim.keymap.set("n", "<leader>rr", "<cmd>OverseerRun<CR>", { desc = "Tasks: Run Overseer Task" })
     end,
   },
 }

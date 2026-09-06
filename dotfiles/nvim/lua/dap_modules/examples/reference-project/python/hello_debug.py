@@ -1,7 +1,7 @@
 """Minimal target for exercising dap_modules' debugpy flow.
 
 Run with: bazel run --config=debugpy //python:hello_debug
-then <leader>gp in Neovim (see ../README.md).
+then <leader>bp in Neovim (see ../README.md).
 
 debugpy (via the `.bazelrc` `debugpy` config's --wait-for-client) pauses
 execution until Neovim attaches, so there's no race to catch it running.

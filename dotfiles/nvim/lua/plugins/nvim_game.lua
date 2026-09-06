@@ -1,5 +1,5 @@
 -- Keybinding learning game.
---   <leader>G        open category menu and start
+--   <leader>Gm       open category menu and start
 --   <leader>Ga       jump straight into ALL categories
 return {
   {
@@ -9,7 +9,7 @@ return {
     lazy   = true,
     keys   = {
       {
-        '<leader>G',
+        '<leader>Gm',
         function() require('nvim_game').start() end,
         desc = 'KeyGame: pick category and play',
       },

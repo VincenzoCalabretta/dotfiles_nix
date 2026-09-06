@@ -1,6 +1,6 @@
 // Minimal target for exercising dap_modules' local gdbserver flow:
 //   bazel run --config=gdbnf //cpp:hello_debug
-// then <leader>gc in Neovim (see ../README.md).
+// then <leader>bC in Neovim (see ../README.md).
 //
 // Loops forever, slowly, printing each step -- deliberately not CPU-bound so
 // there's plenty of time to attach and set a breakpoint before it matters.

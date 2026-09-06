@@ -147,7 +147,7 @@ return {
 
 Then add a matching `.bazelrc` configuration (shown in
 [Required `.bazelrc` configs](#required-bazelrc-configs)), start Neovim from
-the project root, and use `<leader>gc` to select a C++ target. The launcher
+the project root, and use `<leader>bC` to select a C++ target. The launcher
 executes `bazel run --config=gdbnf <target>`, waits for its `gdbserver`, and
 attaches GDB.
 
@@ -221,7 +221,7 @@ full explanation of each field):
 return {
   cpp = {
     -- Unrelated to remote.* below: still used if you ALSO build/debug
-    -- host-native targets from this same repo with <leader>gc.
+    -- host-native targets from this same repo with <leader>bC.
     bazel_config   = "gdbnf",
     gdbserver_port = 1234,
 
@@ -274,10 +274,10 @@ return {
 }
 ```
 
-With this in place: `<leader>gd` (or `:DapRemoteDebug cpp`) opens the Telescope
+With this in place: `<leader>bH` (or `:DapRemoteDebug cpp`) opens the Telescope
 target picker, then — since two hosts are configured — prompts to choose
 `bench` or `rig_b`, then builds, deploys, and attaches. `:DapRemoteDebug rust`
-does the same for `rust_binary`/`rust_test` targets. `<leader>gl` redeploys and
+does the same for `rust_binary`/`rust_test` targets. `<leader>bl` redeploys and
 reattaches to whichever target+host combination ran last.
 
 ### All keys and their defaults
@@ -329,7 +329,7 @@ described below.
 
 `remote.lua` automates the whole loop for a Bazel target that has to run on a
 device other than the machine (or container) Neovim itself is on — a board, a
-VM, or any host reachable over SSH. One action (`<leader>gd` or
+VM, or any host reachable over SSH. One action (`<leader>bH` or
 `:DapRemoteDebug`):
 
 1. Cross-compiles the target on the dev machine: `bazel build --config=<cfg>
@@ -387,13 +387,13 @@ is set — there is no sane default cross-toolchain config to fall back to.
 
 ### Using it
 
-- `<leader>gd` — Telescope picker over `cc_binary`/`cc_test` targets, then (if
+- `<leader>bH` — Telescope picker over `cc_binary`/`cc_test` targets, then (if
   more than one host is configured) `vim.ui.select` to choose which host,
   then build → deploy → attach.
-- `:DapRemoteDebug` / `:DapRemoteDebug cpp` — same as `<leader>gd`.
+- `:DapRemoteDebug` / `:DapRemoteDebug cpp` — same as `<leader>bH`.
 - `:DapRemoteDebug rust` — same pipeline over `rust_binary`/`rust_test`
   targets and `rust.remote`.
-- `<leader>gl` — re-runs the whole pipeline (rebuild + redeploy + reattach)
+- `<leader>bl` — re-runs the whole pipeline (rebuild + redeploy + reattach)
   for whichever target+host combination ran last, persisted the same way the
   local launchers already persist their last target.
 - `<M-t>` (Terminate) and `VimLeavePre` kill the SSH job exactly like they
@@ -640,30 +640,28 @@ the host, or set `bazel_cache` to the container-internal path and accept that
 | `<M-w>` | Add watch (variable under cursor) |
 | `<M-f>` | Jump to the current frame |
 | `<M-p>` | Pause / interrupt |
-| `<leader>gv` / `<leader>gV` | Open / close DAP view |
+| `<leader>bv` | Toggle DAP view |
 
 ### Bazel launchers
 
 | Key | Action |
 |---|---|
-| `<leader>gc` | C++ — Telescope picker (`cc_binary`, `cc_test`) |
-| `<leader>gp` | Python — Telescope picker (`py_binary`, `py_test`) |
-| `<leader>gP` | Python — manual target input |
-| `<leader>gr` | Rust — Telescope picker (`rust_binary`, `rust_test`) |
-| `<leader>gR` | Rust — manual target input |
-| `<leader>gl` | Re-launch last used target (any language, incl. remote) |
-| `<leader>gs` | Attach to the predefined dual gdbservers (`:1234`, `:1235`) |
-| `<leader>gd` | C++ — [deploy & debug on a remote host over SSH](#remote-deployment-over-ssh) |
-| `:DapRemoteDebug [cpp\|rust]` | Same as `<leader>gd`; only entry point for the Rust remote flow |
+| `<leader>bC` | C++ — Telescope picker (`cc_binary`, `cc_test`) |
+| `<leader>bp` | Python — Telescope picker (`py_binary`, `py_test`) |
+| `<leader>bP` | Python — manual target input |
+| `<leader>bu` | Rust — Telescope picker (`rust_binary`, `rust_test`) |
+| `<leader>bU` | Rust — manual target input |
+| `<leader>bl` | Re-launch last used target (any language, incl. remote) |
+| `<leader>bg` | Attach to the predefined dual gdbservers (`:1234`, `:1235`) |
+| `<leader>bH` | C++ — [deploy & debug on a remote host over SSH](#remote-deployment-over-ssh) |
+| `:DapRemoteDebug [cpp\|rust]` | Same as `<leader>bH`; use this command for remote Rust |
 
 ### Telescope DAP extensions
 
 | Key | Action |
 |---|---|
-| `<leader>dfc` | DAP commands |
-| `<leader>dfb` | List breakpoints |
-| `<leader>dfv` | Variables |
-| `<leader>dff` | Frames |
+| `<leader>b?` | Open a menu for commands, breakpoints, variables, and frames |
+| `<leader>bT` | Open the tracepoint-actions menu |
 
 ### Bazel picker (build / run / test)
 
@@ -694,7 +692,7 @@ Inside the recent-targets picker:
 1. Ensure the container is running with port 1234 exposed.
 2. Open Neovim from the project root (the same directory that is mounted into
    the container).
-3. Press `<leader>gc` → Telescope shows all `cc_binary` and `cc_test` targets.
+3. Press `<leader>bC` → Telescope shows all `cc_binary` and `cc_test` targets.
 4. Select a target. The launcher:
    - Kills any existing gdbserver process.
    - Runs `docker exec -i dev bash -c "cd <cwd> && bazel run --config=gdbnf <target>"`.
@@ -705,7 +703,7 @@ Inside the recent-targets picker:
 ### Python target in devcontainer
 
 1. Ensure the container is running with port 5678 exposed.
-2. Press `<leader>gp` → Telescope shows all `py_binary` and `py_test` targets.
+2. Press `<leader>bp` → Telescope shows all `py_binary` and `py_test` targets.
 3. Select a target. The launcher:
    - Runs `docker exec -i dev bash -c "cd <cwd> && bazel run --config=debugpy <target>"`.
    - Monitors stdout and stderr for the `"Listening on"` message from debugpy.
@@ -715,7 +713,7 @@ Inside the recent-targets picker:
 
 ### Re-launching
 
-`<leader>gl` re-launches the last target (persisted across Neovim restarts in
+`<leader>bl` re-launches the last target (persisted across Neovim restarts in
 `~/.cache/nvim/nvim-dap-bazel/last_target.json`) without opening the picker.
 Useful when iterating on a single test.
 

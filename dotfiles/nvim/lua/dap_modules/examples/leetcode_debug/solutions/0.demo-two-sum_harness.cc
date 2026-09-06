@@ -1,7 +1,7 @@
 // Hand-written stand-in for what leetcode_modules/harness.lua (Phase 2)
 // will generate from q.meta_data + the testcase popup buffer:
 //   bazel run --config=gdbnf //solutions:demo_two_sum_debug
-// then <leader>gc in Neovim (see dap_modules/README.md), breakpoint in
+// then <leader>bC in Neovim (see dap_modules/README.md), breakpoint in
 // 0.demo-two-sum.cpp.
 #include <cstdio>
 #include "0.demo-two-sum.cpp"

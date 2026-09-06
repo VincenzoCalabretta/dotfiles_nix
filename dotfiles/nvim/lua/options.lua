@@ -41,8 +41,8 @@ vim.opt.scrolloff = 10
 vim.opt.colorcolumn = '80'
 
 -- Keymaps to reload configuration
-vim.keymap.set("n", "<leader><leader>x", "<cmd>source %<CR>",
-  { desc = "Execute the current lua file" })
+vim.keymap.set("n", "<leader>X", "<cmd>source %<CR>",
+  { desc = "Source the current Lua file" })
 -- Keymaps to execute code
 vim.keymap.set("n", "<leader>x", ":.lua %<CR>")
 vim.keymap.set("v", "<leader>x", ":lua %<CR>")

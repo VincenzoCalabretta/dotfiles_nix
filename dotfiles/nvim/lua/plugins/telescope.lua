@@ -72,11 +72,11 @@ return {
         builtin.find_files { cwd = vim.fn.stdpath 'config' }
       end, { desc = '[S]earch [N]eovim files' })
       -- Making a custom picker,
-      vim.keymap.set("n", "<leader>ep", function()
+      vim.keymap.set("n", "<leader>sp", function()
         require('telescope.builtin').find_files {
           cwd = vim.fs.joinpath(vim.fn.stdpath("data"), "lazy")
         }
-      end,{ desc = '[E]dit neovim [Path] to analyze installed plugins' }
+      end,{ desc = '[S]earch installed [P]lugins' }
       )
       
     require('bazel_picker').setup({
