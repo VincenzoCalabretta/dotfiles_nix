@@ -66,6 +66,7 @@
     fastfetch                # neofetch-style system info summary
     lm_sensors           # sensors command
     ncdu                  # interactive disk usage analyzer
+    kdePackages.filelight # GUI disk usage visualizer (sunburst chart)
     wireshark             # network protocol analyzer / packet capture (passwordless capture set up via dotfiles.wireshark, hosts/home)
 
     # Fonts (nvim, terminals, i3 all expect a Nerd Font)
