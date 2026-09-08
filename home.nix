@@ -18,6 +18,7 @@
     ./modules/ghostty.nix
     ./modules/rust.nix
     ./modules/bazel.nix
+    ./modules/neutral-process-name.nix
   ];
 
   # Match the release you're installing home-manager from. Update in lockstep
