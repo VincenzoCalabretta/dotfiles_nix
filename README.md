@@ -140,7 +140,10 @@ until then the old, already-fixed-upstream bug keeps reproducing locally.
 Notable local code includes:
 
 - Bazel target navigation and picker integration, plus a `starpls`
-  Starlark LSP for BUILD/BUILD.bazel/WORKSPACE/`*.bzl` files;
+  Starlark LSP for BUILD/BUILD.bazel/WORKSPACE/`*.bzl` files — `K` on a
+  rule, `repository_rule`/`repository_ctx` API, `attr.*`, or `native.*`
+  shows starpls's built-in copy of the official Bazel documentation, the
+  same global hover mapping used for every other LSP;
 - custom DAP configuration, UI, trace, and project modules;
 - GDB launch helpers and libstdc++/project pretty-printers;
 - project/session persistence and Git inspection;
