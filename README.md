@@ -144,7 +144,12 @@ Notable local code includes:
   rule, `repository_rule`/`repository_ctx` API, `attr.*`, or `native.*`
   shows starpls's built-in copy of the official Bazel documentation, the
   same global hover mapping used for every other LSP;
-- custom DAP configuration, UI, trace, and project modules;
+- custom DAP configuration, UI, trace, and project modules, including GDB
+  remote deployment: cross-compile a Bazel target, `rsync` it (with its
+  runfiles tree) to a remote host over SSH, start `gdbserver` there with
+  the port tunneled back, and attach local `gdb` — `<leader>bH` /
+  `:DapRemoteDebug` (see `dotfiles/nvim/lua/dap_modules/README.md`'s
+  "Remote deployment over SSH" section);
 - GDB launch helpers and libstdc++/project pretty-printers;
 - project/session persistence and Git inspection;
 - a scratchpad hover workflow and numeric-conversion utilities;
