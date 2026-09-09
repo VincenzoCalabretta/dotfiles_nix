@@ -63,7 +63,9 @@ Submitting a wrong answer keeps the player in the existing game window. It
 shows the correct key, clears the answer field, and requires that exact key
 sequence to be typed and submitted before the game can continue. No tab,
 fixture, temporary buffer, or editor action is created. The missed question is
-still re-queued for a later unaided recall attempt.
+still re-queued for a later unaided recall attempt. If the typed answer is
+itself a real binding for a *different* question, the correction screen also
+shows what that key actually does, so a wrong guess still teaches something.
 
 ### Default-key explanations
 

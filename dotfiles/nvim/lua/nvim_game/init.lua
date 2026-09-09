@@ -165,6 +165,19 @@ local function questions_for(cats)
   return qs
 end
 
+-- A wrong answer sometimes happens to be a *different* real keybinding
+-- (typically the same physical key is the answer to a different question).
+-- Look those up so the correction screen can show what the typed key does.
+local function db_matches(key)
+  local matches = {}
+  for _, kb in ipairs(db) do
+    if kb.key == key then
+      table.insert(matches, kb)
+    end
+  end
+  return matches
+end
+
 --------------------------------------------------------------------------------
 -- Window
 --------------------------------------------------------------------------------
@@ -413,6 +426,16 @@ local function render_remediation()
   table.insert(lines, '')
   table.insert(lines, pad_center('You typed:   ' .. (attempt.answer ~= '' and attempt.answer or '(empty)')))
   hls_list[#hls_list+1] = { #lines - 1, 0, -1, 'NvimGameSubtitle' }
+
+  if attempt.matches and #attempt.matches > 0 then
+    for _, m in ipairs(attempt.matches) do
+      for _, note_line in ipairs(wrap_text(attempt.answer .. ' is actually: ' .. m.desc, W - 6)) do
+        table.insert(lines, pad_center(note_line))
+        hls_list[#hls_list+1] = { #lines - 1, 0, -1, 'NvimGameHint' }
+      end
+    end
+  end
+
   table.insert(lines, '')
 
   local correct_line = pad_center('Correct:     ' .. q.key)
@@ -645,6 +668,7 @@ local function submit()
     answer = answer,
     status = correct and 'correct' or 'wrong',
     corrected = false,
+    matches = (not correct and answer ~= '') and db_matches(answer) or {},
   }
 
   if correct then

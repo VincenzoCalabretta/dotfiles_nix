@@ -69,11 +69,22 @@ assert(default_game.buf == nil)
 
 -- A wrong answer stays in the existing game window. The displayed key must be
 -- typed and submitted; no practice tab or temporary example buffer is opened.
+-- If the wrong answer happens to be a real binding for a different question,
+-- the correction screen shows what that key actually does.
 game.start_category("KeyGame")
 local state = game._state_for_test()
 local first = vim.deepcopy(state.questions[state.q_idx])
+local other
+for _, kb in ipairs(db) do
+	if kb.category == "KeyGame" and kb.key ~= first.key then
+		other = kb
+		break
+	end
+end
+assert(other, "KeyGame needs a second entry for this test")
 local original_question_count = #state.questions
 local original_tab_count = #vim.api.nvim_list_tabpages()
+feed_answer(other.key)
 game.handle_key("__submit__")
 assert(state.phase == "remediation")
 assert(state.q_idx == 1)
@@ -84,6 +95,7 @@ local correction_text = table.concat(vim.api.nvim_buf_get_lines(state.buf, 0, -1
 assert(correction_text:find("ENTER THE CORRECT KEY", 1, true))
 assert(correction_text:find("Type the displayed key", 1, true))
 assert(correction_text:find("Correct:     " .. first.key, 1, true))
+assert(correction_text:find(other.key .. " is actually: " .. other.desc, 1, true))
 
 game.handle_key("__submit__")
 assert(state.phase == "remediation")
