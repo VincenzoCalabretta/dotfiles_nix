@@ -37,6 +37,14 @@ function _v_git_branch() {
 }
 
 set -o vi
+# ble.sh only autoloads lib/keymap.vi.sh lazily, the first time the vi
+# keymap is actually built during ble-attach — which happens too late for
+# the vi-specific bleopt name below to exist yet. Without this, `bleopt
+# default_keymap=vi` silently fails ("option not found") and the
+# vi-mode-color prompt function's first call errors with "No such file or
+# directory" (calling a not-yet-defined function whose name contains
+# slashes), both surviving only because they're wrapped in `2>/dev/null`.
+ble-import lib/keymap.vi.sh
 bleopt default_keymap=vi 2>/dev/null
 # Off by default: without it, ble.sh only redraws its separate "-- INSERT --"
 # status line on a vi mode change, not the PS1 prompt itself (\q{...} below
@@ -56,6 +64,27 @@ function ble/prompt/backslash:v/vi-mode-color {
     ([iR]*) ble/prompt/print $'\033[1;32m' ;;
     (*)      ble/prompt/print $'\033[1;31m' ;;
     esac
+}
+
+# ble.sh's vi keymap binds RET/C-m in insert mode to accept-single-line-or-*
+# (insert a newline unless the buffer is a single line) exactly like its
+# emacs keymap does, but only the emacs keymap's mode indicator explains
+# that (see keymap.emacs.sh's "-- MULTILINE --" string and its RET/C-j
+# hint, shown via its own `ble/widget/emacs/__after_widget__` hook, which
+# refreshes it after every keystroke). ble.sh's vi keymap has no equivalent
+# `__after_widget__` hook — its own mode indicator (prompt_vi_mode_indicator)
+# only recomputes on explicit mode changes and precmd, so patching a hint
+# into it would go stale while typing. With `default_keymap=vi`, a
+# multi-line command (typed, or pasted as more than one statement) just
+# silently stops accepting RET as "run" once it spans more than one line —
+# indistinguishable from the terminal not accepting more input. Put the hint
+# in PS1 itself instead, right after the vi-mode-color `\$` above: like that
+# escape, ble.sh re-evaluates `\q{...}` in PS1 on every keystroke, so this
+# stays live regardless of the vi keymap's sparser indicator refresh.
+function ble/prompt/backslash:v/vi-mode-multiline-hint {
+    ble/prompt/unit/add-hash '$_ble_edit_str'
+    [[ $_ble_edit_str == *$'\n'* ]] || return 0
+    ble/prompt/print $'\033[1m-- MULTILINE --\033[m (\033[35mRET\033[m: newline, \033[35mC-j\033[m: run) '
 }
 
 # Plain-readline fallback PS1 (static insert-mode green) for the rare case
@@ -109,6 +138,6 @@ export PATH=/home/v/.opencode/bin:$PATH
 # and won't notice a later reassignment (see the
 # `ble/prompt/backslash:v/vi-mode-color` function above).
 if [[ ${BLE_VERSION-} ]]; then
-    PS1='\[\033[1;37m\][$(_v_git_branch)] \[\033[0;34m\]\w\[\033[0m\] \q{v/vi-mode-color}\$\[\033[0m\] '
+    PS1='\[\033[1;37m\][$(_v_git_branch)] \[\033[0;34m\]\w\[\033[0m\] \q{v/vi-mode-color}\$\[\033[0m\] \q{v/vi-mode-multiline-hint}'
     ble-attach
 fi
