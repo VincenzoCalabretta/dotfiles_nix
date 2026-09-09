@@ -74,6 +74,11 @@ in
     # custom dialects needs its own project-built mlir-lsp-server for full
     # diagnostics on its ops.
     llvmPackages.mlir
+
+    # Bazel/Starlark LSP (BUILD, BUILD.bazel, WORKSPACE, *.bzl -- Neovim's
+    # built-in filetype detection maps all of these to 'bzl'). Not
+    # mason-managed: mason has no Starlark package.
+    starpls
     ];
 
     xdg.configFile."nvim".source = ../dotfiles/nvim;

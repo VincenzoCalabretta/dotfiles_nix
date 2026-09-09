@@ -139,7 +139,8 @@ until then the old, already-fixed-upstream bug keeps reproducing locally.
 
 Notable local code includes:
 
-- Bazel target navigation and picker integration;
+- Bazel target navigation and picker integration, plus a `starpls`
+  Starlark LSP for BUILD/BUILD.bazel/WORKSPACE/`*.bzl` files;
 - custom DAP configuration, UI, trace, and project modules;
 - GDB launch helpers and libstdc++/project pretty-printers;
 - project/session persistence and Git inspection;

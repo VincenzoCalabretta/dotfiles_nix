@@ -252,8 +252,19 @@ return {
         capabilities = capabilities,
       })
 
+      -- Starpls (Bazel/Starlark)
+      -- Not mason-managed: installed via Nix (modules/nvim.nix). Neovim's
+      -- built-in filetype detection maps BUILD, BUILD.bazel, WORKSPACE, and
+      -- *.bzl all to filetype 'bzl'.
+      vim.lsp.config('starpls', {
+        cmd = { 'starpls', 'server' },
+        filetypes = { 'bzl' },
+        root_markers = { 'WORKSPACE', 'WORKSPACE.bazel', 'MODULE.bazel', '.git' },
+        capabilities = capabilities,
+      })
+
       -- ── 6. Enable servers ─────────────────────────────────────────────
-      vim.lsp.enable({ 'lua_ls', 'ruff', 'basedpyright', 'rust_analyzer', 'clangd', 'nixd', 'mlir_lsp', 'tblgen_lsp' })
+      vim.lsp.enable({ 'lua_ls', 'ruff', 'basedpyright', 'rust_analyzer', 'clangd', 'nixd', 'mlir_lsp', 'tblgen_lsp', 'starpls' })
 
       -- ── 7. Diagnostics display ────────────────────────────────────────
       vim.diagnostic.config({
