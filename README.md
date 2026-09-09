@@ -1,111 +1,61 @@
 # dotfiles_nix
 
 A generic, reusable NixOS/Home Manager module library: terminal, shell, and
-editor configuration, plus a handful of small opt-in NixOS building blocks
-(WireGuard, a Forgejo Actions runner, hybrid-GPU NVIDIA support, packet
-capture policy). No personal packages, no private flake inputs, no baked-in
-username, home directory, or host identity.
+editor configuration, plus opt-in NixOS building blocks (WireGuard, a
+Forgejo Actions runner, hybrid-GPU NVIDIA support, packet capture policy).
+No personal packages, private flake inputs, or baked-in username/host
+identity.
 
-This repo does not itself deploy anything. It exists to be imported: a
-consuming flake defines its own hosts and its own Home Manager profile,
-pulling in whichever pieces of this library it wants — see
-`home.nix.example` and `configuration.nix.example`. My own personal
-deployment (real hosts, private local-AI stack, personal packages) lives in
-a separate private overlay repo that imports this one; see "Design" below
-for why the split exists.
+This repo does not deploy anything itself — it's imported by a consuming
+flake that defines its own hosts and Home Manager profile (see
+`home.nix.example` / `configuration.nix.example`). My own real deployment
+(hosts, private local-AI stack, personal packages) lives in a separate
+private overlay repo that imports this one, so this half stays usable on
+machines (e.g. a work laptop) that must not reach that private
+infrastructure.
 
 ## What the flake exports
 
 | Output | Purpose |
 |---|---|
-| `homeManagerModules.base` | Generic Home Manager profile: tmux, Neovim, zsh, bash, `lf`, i3, ghostty, Rust. No personal packages, private inputs, or username/homeDirectory. |
-| `homeConfigurations.example` | `homeManagerModules.base` alone, under a placeholder identity — proves it evaluates and activates with zero private inputs reachable. |
+| `homeManagerModules.base` | Generic Home Manager profile: tmux, Neovim, zsh, bash, `lf`, i3, ghostty, Rust. |
+| `homeConfigurations.example` | `base` under a placeholder identity — proves it activates with zero private inputs reachable. |
 | `nixosModules.nixos-base` | Shared NixOS baseline (unfree packages, flakes enabled, zsh, OpenSSH). |
-| `nixosModules.wireguard` | Opt-in `wg-quick` interface module with out-of-store config files. |
+| `nixosModules.wireguard` | Opt-in `wg-quick` interfaces, config files outside the Nix store. |
 | `nixosModules.forgejo-runner` | Opt-in host-executed Forgejo Actions runner. |
 | `nixosModules.nvidia` | Opt-in hybrid Intel/NVIDIA PRIME-offload configuration. |
 | `nixosModules.wireshark` | Opt-in passwordless packet capture for one user. |
 | `nixosModules.netdebug` | Opt-in scoped passwordless `tcpdump` for one user. |
-| `packages.x86_64-linux.deploy-host` | Build, switch, activate Home Manager, and set the shell for *any* flake passed via `--flake` |
-| `packages.x86_64-linux.capture-host` | Snapshot live `/etc/nixos` state into a host directory |
-| `packages.x86_64-linux.set-default-shell` | Set the login shell to zsh |
-| `checks.x86_64-linux.*` | Home Manager base-profile build, deployment tools, and a NixOS VM test of the shared modules |
+| `nixosModules.compiler-explorer` | Opt-in self-hosted Compiler Explorer service. |
+| `packages.deploy-host` | Build, switch, and activate Home Manager for any flake via `--flake`. |
+| `packages.capture-host` | Snapshot live `/etc/nixos` state into a host directory. |
+| `packages.set-default-shell` | Set the login shell to zsh. |
+| `checks.*` | Home Manager build, deployment tools, and NixOS/Neovim tests — see [Testing](#testing). |
 
-The flake is x86_64-Linux-specific. `deploy-host` and `capture-host` are
-generic — they take `--flake <path>` — so a consuming flake reuses them
-directly instead of redefining its own build/switch entry points.
-
-## Design: why this repo has no hosts or private inputs
-
-This started as one repo with everything: two real NixOS hosts, a private
-local-AI stack (`opencode`/`claude` MCP wiring pulling in flake inputs from
-a personal Forgejo instance), and personal packages, all under one
-`homeConfigurations."v"`. That made it impossible to reuse on a machine that
-must not fetch that private infrastructure — a work laptop, for instance,
-with its own username and no route to a personal Forgejo.
-
-The fix was to make this repo the generic, private-infra-free half — a
-module *library*, not a deployment — and move everything personal (hosts,
-private inputs, opencode/claude, personal packages) into a separate private
-overlay repo that imports it via `inputs.dotfiles`. Concretely:
-
-- `home.nix` (this repo) has no `home.username`/`home.homeDirectory` and no
-  personal packages; it's exported as `homeManagerModules.base`.
-- `modules/opencode.nix`, `modules/claude.nix`, `modules/pi.nix`, and
-  `modules/llama-relay.nix` — all coupled to the private
-  `llama-server`/`opencode-mcp-tools` flake inputs and a personal Forgejo —
-  live in the overlay repo, not here.
-- `modules/hardware.nix` (this laptop's own audio/USB-device quirks) also
-  lives in the overlay, colocated with the one host it applies to — it was
-  never a reusable module, just factored into its own file.
-- The real `hosts/home`, `hosts/server` configurations, with their real
-  hostnames, locale, disk UUIDs, and usernames, live in the overlay.
-- `homeConfigurations.example` and `checks.home-manager-build` in *this*
-  repo prove the base profile evaluates and activates standalone, with zero
-  private inputs reachable — that's the actual portability guarantee, not
-  just a claim in prose.
-
-A work-machine deployment is then just another consumer of this same
-library: its own flake (or another spot in the overlay repo) sets its own
-`home.username`/`homeDirectory`/hostname and imports only the modules it
-wants, with no path to the private inputs at all.
+x86_64-Linux only. `deploy-host`/`capture-host` take `--flake <path>`, so a
+consumer reuses them instead of redefining its own build/switch tooling.
 
 ## Repository layout
 
 ```text
 .
-├── flake.nix                     # inputs, module-library outputs, generic deploy tools
-├── flake.lock                    # exact nixpkgs and Home Manager pins
-├── home.nix                      # generic base profile (homeManagerModules.base)
-├── home.nix.example              # template for consuming homeManagerModules.base
-├── configuration.nix.example     # template for consuming nixosModules.*
-├── modules/
-│   ├── nixos-base.nix            # shared NixOS baseline
-│   ├── nvidia.nix                # hybrid-GPU PRIME offload (bus IDs are options, no default)
-│   ├── wireguard.nix             # out-of-store wg-quick service definitions
-│   ├── forgejo-runner.nix        # stable runner user, service and host tools
-│   ├── wireshark.nix             # privileged capture policy (user is an option)
-│   ├── netdebug.nix              # scoped passwordless tcpdump policy (user is an option)
-│   └── {nvim,tmux,zsh,...}.nix   # Home Manager packages and deployed configs
+├── flake.nix                  # inputs, module-library outputs, deploy tools
+├── home.nix                   # generic base profile (homeManagerModules.base)
+├── home.nix.example           # template for consuming homeManagerModules.base
+├── configuration.nix.example  # template for consuming nixosModules.*
+├── modules/                   # one file per NixOS/Home Manager module
 ├── dotfiles/
-│   ├── nvim/                     # Lua config, DAP, LSP, pickers and GDB helpers
-│   ├── tmux/                     # session/debug/navigation helpers
-│   ├── zsh/, bash/                # shell, aliases and plugins
-│   └── i3/, ghostty/, lf/         # desktop/terminal/file-manager configuration
-├── tools/
-│   ├── deploy-host.sh            # controlled live deployment sequence (generic, takes --flake)
-│   ├── capture-host.sh           # portable host snapshot + secret guardrail
-│   └── check-checklist-coverage.sh  # generic CHECKLIST.md marker checker
-├── tests/checklist-vm.nix        # isolated NixOS integration test of the shared modules
-└── .forgejo/workflows/ci.yml     # self-hosted CI: `nix flake check`
+│   ├── nvim/                  # Lua config, DAP, LSP, pickers, GDB helpers
+│   ├── tmux/, zsh/, bash/     # shell and multiplexer config
+│   └── i3/, ghostty/, lf/     # desktop/terminal/file-manager config
+├── tools/                     # deploy-host.sh, capture-host.sh
+├── tests/                     # NixOS VM and Neovim plugin tests
+└── .forgejo/workflows/ci.yml  # self-hosted CI: `nix flake check`
 ```
 
-## Home Manager profile (`homeManagerModules.base`)
+## Consuming it
 
-Terminal, shell, editor, file manager, window manager, and Rust modules,
-with no personal packages, no private flake inputs, and no baked-in
-`home.username`/`home.homeDirectory`. A consumer imports it and layers its
-own identity and extras on top — see `home.nix.example`:
+Import `homeManagerModules.base` and layer your own identity on top:
 
 ```nix
 { pkgs, inputs, ... }:
@@ -113,301 +63,105 @@ own identity and extras on top — see `home.nix.example`:
   imports = [ inputs.dotfiles.homeManagerModules.base ];
   home.username = "you";
   home.homeDirectory = "/home/you";
-  home.packages = with pkgs; [ /* whatever's specific to this machine */ ];
+  home.packages = with pkgs; [ /* machine-specific extras */ ];
 }
 ```
 
-The configuration deliberately deploys both a program and the runtime
-dependencies referenced by its scripts; a tmux binding or Neovim tool should
-not depend on an untracked host package.
+NixOS modules work the same way — import the one you want and set its
+options (see `configuration.nix.example`):
 
-### Neovim
-
-The Neovim tree is Lua-based and pins its plugin graph in
-`dotfiles/nvim/lazy-lock.json`. Nix supplies LSPs and native build
-dependencies rather than delegating language-server installation to Mason.
-
-Home Manager only deploys `lazy-lock.json` itself — the plugin checkouts
-under lazy.nvim's own data directory (`~/.local/share/nvim/lazy/`) are
-managed by lazy.nvim at runtime, not the Nix store, and `checker.enabled`
-is deliberately off (see `dotfiles/nvim/lua/lazy/lazy.lua`) so lazy.nvim
-never auto-syncs them in the background. That means a bump to
-`lazy-lock.json` — e.g. moving a plugin's pin past a commit that fixed a
-crash — has no effect on an existing checkout until you run `:Lazy
-restore` (or `:Lazy sync`) yourself after activating the new generation;
-until then the old, already-fixed-upstream bug keeps reproducing locally.
-
-Notable local code includes:
-
-- Bazel target navigation and picker integration, plus a `starpls`
-  Starlark LSP for BUILD/BUILD.bazel/WORKSPACE/`*.bzl` files — `K` on a
-  rule, `repository_rule`/`repository_ctx` API, `attr.*`, or `native.*`
-  shows starpls's built-in copy of the official Bazel documentation, the
-  same global hover mapping used for every other LSP;
-- custom DAP configuration, UI, trace, and project modules, including GDB
-  remote deployment: cross-compile a Bazel target, `rsync` it (with its
-  runfiles tree) to a remote host over SSH, start `gdbserver` there with
-  the port tunneled back, and attach local `gdb` — `<leader>bH` /
-  `:DapRemoteDebug` (see `dotfiles/nvim/lua/dap_modules/README.md`'s
-  "Remote deployment over SSH" section);
-- GDB launch helpers and libstdc++/project pretty-printers;
-- project/session persistence and Git inspection;
-- a scratchpad hover workflow and numeric-conversion utilities;
-- an opt-in Compiler Explorer client for a configurable self-hosted API; and
-- Treesitter, completion, diagnostics, profiler, aerial, telescope, and
-  diff/history integrations.
-
-#### Compiler Explorer
-
-Enable the client in a Home Manager profile with
-`dotfiles.nvim.compilerExplorer.enable = true`. It defaults to
-`http://127.0.0.1:10240`; override `dotfiles.nvim.compilerExplorer.url` for a
-different endpoint. The same option deploys a Home Manager systemd user
-service. It is socket-activated, binds only to loopback, and exposes the
-flake-pinned GCC, Clang, and Rust toolchains. Because it runs as the Home
-Manager user, local compilation can resolve project headers referenced by a
-compilation database. Override `dotfiles.nvim.compilerExplorer.port` or
-`.idleTimeoutSec` when needed.
-
-After activating the Home Manager generation, open a C or C++ translation unit
-in Neovim and press `<leader>ce`. Neovim finds the nearest
-`compile_commands.json`, selects the entry for the current file, resolves its
-relative paths, removes output/dependency flags, and sends the remaining flags
-to the matching local GCC or Clang backend. The generated assembly opens in a
-vertical split. Select a range in visual mode and press the same mapping to
-compile only that selection.
-
-The database may contain either `arguments` arrays or shell-quoted `command`
-strings. Response files are expanded, which covers Bazel databases that put
-their arguments in `@...` parameter files. Project include paths, defines,
-language standards, target flags, forced includes, and sysroots are preserved.
-The source directory is added as an `-iquote` path so neighboring quoted
-headers still resolve after Compiler Explorer copies the source into its
-temporary directory. For C and C++, a missing, malformed, stale, or unmatched
-database is reported as an error instead of silently compiling with incomplete
-flags. Run `:CECompile` to deliberately enter flags manually. Rust buffers keep
-the plugin's interactive compiler/flags prompts because Cargo does not produce
-`compile_commands.json`.
-
-The search checks each parent for the database directly and under common CMake
-build directories (`build`, `build/debug`, `build/release`,
-`cmake-build-debug`, `cmake-build-release`, and `out`). For another layout, set
-`vim.g.compiler_explorer_compile_commands` globally or
-`vim.b.compiler_explorer_compile_commands` for one buffer to an explicit path.
-
-The service starts automatically on the first request and exits after five
-minutes without a request, so an inactive `compiler-explorer.service` while
-`compiler-explorer.socket` remains active is normal.
-
-The most useful commands are:
-
-- `:CECompileProject` — compile using the current file's compilation database
-  entry, reporting an error when it cannot be used;
-- `:CECompile` — bypass the database and select flags interactively;
-- `:CECompileLive` — compile now and recompile after each save;
-- `:CECompile compiler=nix-gcc-cpp flags=-O2\ -Wall` — select a compiler and
-  flags without prompts (`nix-gcc-c`, `nix-clang-c`, `nix-gcc-cpp`,
-  `nix-clang-cpp`, and `nix-rustc` are available);
-- `:CECompile!` — create another assembly window instead of reusing the last
-  one;
-- `:CEFormat`, `:CEAddLibrary`, and `:CELoadExample` — use the corresponding
-  capabilities advertised by the local server;
-- `:CEOpenWebsite` — open the current source/compiler state in the self-hosted
-  web interface;
-- `:CEShowTooltip` and `:CEGotoLabel` — inspect an instruction or jump to a
-  label from an assembly buffer; and
-- `:CEDeleteCache` — clear the client's cached language/compiler catalog.
-
-In any assembly buffer, including ordinary `.s` and preprocessed `.S` source
-files, press `K` (or run `:CEAssemblyHelp`) for architecture-aware help. On an
-instruction, it uses the self-hosted Compiler Explorer's complete generated
-opcode documentation. On a register, it explains its width, aliases, and
-architectural role. When the cursor is on an operand or Intel size syntax such
-as `qword ptr`, the lookup automatically uses the instruction mnemonic from
-that line instead of invoking Neovim's manual-page lookup. Press `K` again to
-focus the documentation window for scrolling or navigation, and `q` there to
-close it.
-
-Compiler Explorer output carries its architecture as metadata. For an ordinary
-assembly file, the first lookup infers the architecture from strong source
-evidence such as `.thumb`, `.intel_syntax`, an `rv64` attribute, or distinctive
-register syntax, and reports both the selected architecture and the evidence
-with its line number. If a file is ambiguous, set it buffer-locally with
-`:CEAssemblyArchitecture arm32` (supported values are `amd64`, `aarch64`,
-`arm32`, `riscv64`, `power`, `ptx`, `sass`, `avr`, `6502`, `65c816`, and
-`llvm`). Run `:CEAssemblyArchitecture` without an argument to display the
-current selection and its source. This buffer-local mapping does not change
-`K` in non-assembly buffers.
-
-Compiler diagnostics populate the quickfix list. Assembly/source line matches
-are highlighted as the cursor moves. Run `:help compiler-explorer-commands`
-for every filter and argument, including binary output and Intel versus AT&T
-syntax.
-
-To verify or troubleshoot the local service outside Neovim:
-
-```console
-systemctl --user status compiler-explorer.socket
-curl -fsS http://127.0.0.1:10240/api/languages
-journalctl --user --unit compiler-explorer.service --since today
-```
-
-Compilation is deliberately non-executable: the service returns assembly and
-diagnostics but will not run submitted programs.
-
-### tmux, i3, shell and terminal
-
-The tmux configuration provides i3-like navigation, project session creation,
-debug-session helpers, display toggles, and command/language cheat sheets.
-`home.sessionPath` exposes the helper directory so both tmux and i3 can invoke
-scripts by name. `.xinitrc` is generated to load Home Manager's session
-variables before `exec i3`, for setups that start X manually via `startx`.
-
-Zsh and Bash are both deployed (Oh My Zsh / ble.sh respectively, syntax
-highlighting, autosuggestions, vi-mode, and repository-local aliases).
-Ghostty, `lf`, i3, fonts, clipboard tools, archive tools, compiler basics,
-Git, and daily CLI utilities are part of the same activation closure.
-
-## NixOS modules
-
-| Module | What it needs from the consumer |
+| Module | Required option |
 |---|---|
-| `nixos-base` | Nothing — drop it in as-is. |
-| `wireguard` | Optionally override `dotfiles.wireguard.interfaces`; config files stay outside the Nix store (default paths: `/etc/wireguard/{wg1,wg3}.conf`). |
-| `forgejo-runner` | `dotfiles.forgejo-runner.url` (no default — must be set). Registration token and SSH deploy key are provisioned out of band. |
-| `nvidia` | `dotfiles.nvidia.intelBusId`/`.nvidiaBusId` (no default — `lspci -nn \| grep -Ei 'vga\|3d'` on the actual machine). |
-| `wireshark` | `dotfiles.wireshark.user` (no default). |
-| `netdebug` | `dotfiles.netdebug.user` (no default). |
-| `compiler-explorer` | Nothing; optionally override `dotfiles.compiler-explorer.port` or `.idleTimeoutSec`. |
+| `nixos-base` | none |
+| `wireguard` | none (override `dotfiles.wireguard.interfaces` if needed) |
+| `forgejo-runner` | `dotfiles.forgejo-runner.url` |
+| `nvidia` | `dotfiles.nvidia.intelBusId` / `.nvidiaBusId` |
+| `wireshark` | `dotfiles.wireshark.user` |
+| `netdebug` | `dotfiles.netdebug.user` |
+| `compiler-explorer` | none |
 
-None of these hardcode a username, host identity, or secret — see
-`configuration.nix.example` for how a consumer wires them up:
+These intentionally have no defaults for machine-specific values — a
+missing option fails evaluation loudly instead of reusing someone else's
+laptop's values.
 
-```nix
-{ pkgs, inputs, ... }:
-{
-  imports = [ inputs.dotfiles.nixosModules.wireguard ];
-  dotfiles.wireguard.enable = true;
-  # ...
-}
-```
+### Neovim highlights
 
-## Safe evaluation and testing
+Lua-based, plugins pinned in `dotfiles/nvim/lazy-lock.json`; Nix supplies
+LSPs and native build deps instead of Mason where practical. Notable
+pieces:
 
-```sh
-# Parse/evaluate every flake output without building closures.
-nix flake check --no-build
+- Bazel target picker plus a `starpls` Starlark LSP for BUILD/`*.bzl` files
+  (`K` shows the built-in Bazel docs, same as any other LSP hover).
+- Custom DAP config covering local, devcontainer, and remote (cross-compile
+  → rsync → `gdbserver` over SSH → attach) debugging — see
+  `dotfiles/nvim/lua/dap_modules/README.md`.
+- GDB launch helpers with libstdc++ pretty-printers.
+- An opt-in Compiler Explorer client (`dotfiles.nvim.compilerExplorer.enable
+  = true`): press `<leader>ce` on a C/C++/Rust buffer to compile the current
+  file (or selection) against a local, socket-activated Compiler Explorer
+  service and view the generated assembly; `K` in an assembly buffer gives
+  architecture-aware instruction/register help. Run `:help
+  compiler-explorer-commands` for the full command reference.
+- Project/session persistence, Git inspection, Treesitter, completion,
+  diagnostics, and Telescope integrations.
 
-# Build the base Home Manager profile under a placeholder identity.
-nix build .#checks.x86_64-linux.home-manager-build -o out/home-manager-build
-
-# Run the NixOS VM integration test for the shared modules (wireguard,
-# forgejo-runner, netdebug, wireshark) — proves they produce the state their
-# option docs promise, independent of any concrete host.
-nix build .#checks.x86_64-linux.checklist-vm -L -o out/checklist-vm
-
-# Run the dap_modules Neovim plugin's own unit test suite hermetically
-# (nixpkgs vimPlugins, no lazy.nvim install or network needed) and produce
-# its line-coverage HTML report — see dotfiles/nvim/lua/dap_modules/README.md's
-# "Testing" section.
-nix build .#checks.x86_64-linux.dap-modules-coverage -o out/dap-modules-coverage
-# -> out/dap-modules-coverage/index.html
-```
-
-`-o out/<name>` keeps result symlinks out of the repo root, in the
-gitignored `out/` directory, instead of the default `./result`. Omitting
-`-o` still works (`result`/`result-*` stay gitignored too) but clutters the
-root, so prefer `-o out/<name>` for anything you intend to keep around.
-
-The complete local gate is `nix flake check` — it requires no private
-inputs and no network access beyond the standard Nix substituters.
-
-## CI
-
-Every push and pull request runs `nix flake check` on a self-hosted Forgejo
-Actions runner (deployed by the private overlay repo's `home` host, via this
-repo's own `nixosModules.forgejo-runner`). See `.forgejo/workflows/ci.yml`.
-
-## Adapting / consuming the library
-
-- **Just want the terminal/editor/shell profile?** Import
-  `homeManagerModules.base` from your own flake (see `home.nix.example`).
-  No fork needed.
-- **Want the NixOS building blocks (WireGuard, Forgejo runner, NVIDIA
-  PRIME, packet-capture policy)?** Import the relevant `nixosModules.*` from
-  your own host configuration (see `configuration.nix.example`) and set
-  whatever options that module requires (see the table above).
-- **Want to see a complete, real deployment built this way** — hosts,
-  private local-AI stack, personal packages, secrets provisioning checklist
-  — that's the private overlay repo, not this one.
-
-The `nvidia`/`wireshark`/`netdebug`/`forgejo-runner` modules intentionally
-have no defaults for machine-specific values (bus IDs, usernames, URLs) —
-evaluation fails loudly if you enable one without setting them, rather than
-silently reusing someone else's laptop's values.
+Lazy.nvim's update checker is off, so a `lazy-lock.json` bump doesn't
+reach an existing checkout on its own — run `:Lazy restore` after
+activating a new generation to pick it up.
 
 ## Deploying
 
-These steps assume a consuming flake with a `homeConfigurations."<name>"`
-built from `homeManagerModules.base` (see `home.nix.example`).
-
-**First activation on a machine without Home Manager installed yet** — its
-own installer bootstraps itself via `nix run`, so nothing needs to be
-installed up front:
+First activation on a machine without Home Manager installed yet:
 
 ```sh
 nix run github:nix-community/home-manager -- switch -b backup --flake '.#<name>'
 ```
 
-`-b backup` tells Home Manager to rename any pre-existing plain files it
-would otherwise refuse to overwrite (e.g. an existing `~/.bashrc`) to
-`<file>.backup` instead of failing the activation. It only matters on this
-first run — once Home Manager owns those paths as store symlinks, later
-switches never hit the conflict.
+`-b backup` renames any pre-existing plain file Home Manager would
+otherwise refuse to overwrite; only matters on this first run.
 
-**Subsequent switches**, once the consuming flake defines its own
-`packages.<system>.activate` (a thin wrapper around `home-manager switch
---flake`, as `deploy-host` expects — see the note on `packages.activate` in
-`flake.nix`):
+Once the consuming flake defines its own `packages.<system>.activate`:
 
 ```sh
 nix run '.#activate'
 ```
 
-**Combined NixOS + Home Manager deploy** for a host built from this
-repo's `nixosModules.*`, using the generic `deploy-host` tool this flake
-exports:
+For a full NixOS + Home Manager host, use this flake's `deploy-host`
+(builds, switches, activates Home Manager, sets the default shell):
 
 ```sh
-nix run 'github:<your-fork-or-repo>#deploy-host' -- --flake '.' --host '<hostname>'
+nix run 'github:<your-fork>#deploy-host' -- --flake '.' --host '<hostname>'
 ```
 
-`deploy-host` builds and switches the NixOS system configuration, then runs
-the consuming flake's `#activate` to bring Home Manager in line, then sets
-the default shell to zsh unless it already is. Pass `--skip-build`,
-`--skip-home`, or `--no-shell` to omit any of those steps — see
-`tools/deploy-host.sh` for the exact sequence.
+`--skip-build`, `--skip-home`, and `--no-shell` each omit one step — see
+`tools/deploy-host.sh`.
+
+## Testing
+
+```sh
+nix flake check                                              # everything
+nix build .#checks.x86_64-linux.home-manager-build            # base profile builds
+nix build .#checks.x86_64-linux.checklist-vm -L                # NixOS module VM test
+nix build .#checks.x86_64-linux.dap-modules-coverage           # nvim DAP unit tests + coverage
+```
+
+Add `-o out/<name>` to keep result symlinks in the gitignored `out/`
+directory instead of cluttering the repo root. `nix flake check` needs no
+private inputs and no network beyond the standard Nix substituters. CI runs
+it on every push/PR via a self-hosted Forgejo runner (`.forgejo/workflows/ci.yml`).
 
 ## Secret handling
 
-No private WireGuard keys, Forgejo registration tokens, or SSH private keys
-should ever be committed here — the modules in this repo are specifically
-designed so that's structurally true (they only take *paths* to secrets, and
-those default paths point outside the Nix store). Still, before publishing
-any change, review tracked content and history:
+Modules here only ever take *paths* to secrets, with defaults pointing
+outside the Nix store — no key material should ever be committed. Before
+publishing a change, double-check anyway:
 
 ```sh
-git grep -n -I -E \
-  '(BEGIN (OPENSSH|RSA|EC) PRIVATE KEY|TOKEN=|private[_-]?key|password)'
-git log --all --stat
+git grep -n -I -E '(BEGIN (OPENSSH|RSA|EC) PRIVATE KEY|TOKEN=|private[_-]?key|password)'
 ```
 
 ## Known limitations
 
-- Only x86_64 Linux is exported.
-- `modules/hardware.nix`-style machine-specific quirks don't belong in this
-  repo by design — if you're forking a module and it turns out to encode a
-  specific machine's hardware, that's a sign it should live in your own
-  overlay instead, colocated with the host it applies to.
-- CI (in the overlay repo, which owns the runner) runs jobs directly on the
-  host without container isolation.
+- x86_64 Linux only.
+- Machine-specific quirks (`modules/hardware.nix`-style) belong in your own
+  overlay, colocated with the host they apply to — not here.
