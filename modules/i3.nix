@@ -20,6 +20,7 @@
     playerctl
     pulseaudio           # provides pactl for i3 volume bindings
     pulsemixer           # TUI mixer for PipeWire/Pulse sinks & sources
+    wiremix              # native PipeWire TUI; quick default-sink/source switching
     scrot
     maim
     slop
