@@ -1,5 +1,5 @@
 font-size = 8
-theme = Kanagawa Wave
+theme = Catppuccin Mocha
 class = ghostty
 command = zsh
 window-decoration = false
