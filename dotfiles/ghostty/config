@@ -1,5 +1,5 @@
 font-size = 8
-theme = Catppuccin Mocha
+theme = TokyoNight Night
 class = ghostty
 command = zsh
 window-decoration = false
