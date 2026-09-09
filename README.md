@@ -326,6 +326,48 @@ have no defaults for machine-specific values (bus IDs, usernames, URLs) —
 evaluation fails loudly if you enable one without setting them, rather than
 silently reusing someone else's laptop's values.
 
+## Deploying
+
+These steps assume a consuming flake with a `homeConfigurations."<name>"`
+built from `homeManagerModules.base` (see `home.nix.example`).
+
+**First activation on a machine without Home Manager installed yet** — its
+own installer bootstraps itself via `nix run`, so nothing needs to be
+installed up front:
+
+```sh
+nix run github:nix-community/home-manager -- switch -b backup --flake '.#<name>'
+```
+
+`-b backup` tells Home Manager to rename any pre-existing plain files it
+would otherwise refuse to overwrite (e.g. an existing `~/.bashrc`) to
+`<file>.backup` instead of failing the activation. It only matters on this
+first run — once Home Manager owns those paths as store symlinks, later
+switches never hit the conflict.
+
+**Subsequent switches**, once the consuming flake defines its own
+`packages.<system>.activate` (a thin wrapper around `home-manager switch
+--flake`, as `deploy-host` expects — see the note on `packages.activate` in
+`flake.nix`):
+
+```sh
+nix run '.#activate'
+```
+
+**Combined NixOS + Home Manager deploy** for a host built from this
+repo's `nixosModules.*`, using the generic `deploy-host` tool this flake
+exports:
+
+```sh
+nix run 'github:<your-fork-or-repo>#deploy-host' -- --flake '.' --host '<hostname>'
+```
+
+`deploy-host` builds and switches the NixOS system configuration, then runs
+the consuming flake's `#activate` to bring Home Manager in line, then sets
+the default shell to zsh unless it already is. Pass `--skip-build`,
+`--skip-home`, or `--no-shell` to omit any of those steps — see
+`tools/deploy-host.sh` for the exact sequence.
+
 ## Secret handling
 
 No private WireGuard keys, Forgejo registration tokens, or SSH private keys
