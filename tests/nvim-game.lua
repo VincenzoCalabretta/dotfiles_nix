@@ -113,4 +113,36 @@ assert(state.phase == "feedback")
 game.handle_key("__quit__")
 assert(state.buf == nil)
 
+-- <Esc> is itself a real Neovim binding (clear search highlight / exit
+-- terminal mode), so it doubles as an answer token, not just the game's
+-- quit control (https://github.com/VincenzoCalabretta/dotfiles_nix/issues/7).
+-- Confirm it is captured as the literal answer in both the question phase
+-- and the correction/remediation screen, rather than closing the window.
+game.start_category("Windows")
+state = game._state_for_test()
+local esc_idx
+for i, q in ipairs(state.questions) do
+	if q.key == "<Esc>" then esc_idx = i end
+end
+assert(esc_idx, "Windows category needs an <Esc> entry for this test")
+state.q_idx = esc_idx
+
+game.handle_key("__escape__")
+assert(state.input == "<Esc>", "Escape was not captured as the question answer")
+assert(state.win and vim.api.nvim_win_is_valid(state.win), "Escape closed the quiz window instead of answering")
+game.handle_key("__submit__")
+assert(state.phase == "feedback" and state.last_attempt.status == "correct", "the <Esc> question was not accepted")
+
+state.q_idx = esc_idx
+game.handle_key("z")
+game.handle_key("__submit__")
+assert(state.phase == "remediation")
+game.handle_key("__escape__")
+assert(state.input == "<Esc>", "Escape was not captured as the remediation answer")
+assert(state.win and vim.api.nvim_win_is_valid(state.win), "Escape closed the quiz window during remediation")
+game.handle_key("__submit__")
+assert(state.phase == "feedback" and state.last_attempt.corrected, "remediation did not accept <Esc> as the correction")
+game.handle_key("__quit__")
+game.handle_key("__quit__")
+
 print("nvim_game: ok")
