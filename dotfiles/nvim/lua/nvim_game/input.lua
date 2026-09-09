@@ -1,8 +1,7 @@
--- Shared key-token capture for the quiz and its correction exercises.
+-- Shared key-token capture for the quiz and its in-place correction prompt.
 --
 -- This deliberately captures the physical sequence instead of invoking the
--- configured mapping.  A drill can therefore safely practice mappings that
--- normally stage a hunk, start a debugger, or change editor state.
+-- configured mapping, so answering a question never triggers an editor action.
 
 local M = {}
 

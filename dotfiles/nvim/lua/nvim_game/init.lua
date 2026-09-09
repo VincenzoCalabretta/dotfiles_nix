@@ -5,7 +5,6 @@
 local M = {}
 local db = require('nvim_game.db')
 local capture = require('nvim_game.input')
-local practice = require('nvim_game.practice')
 
 --------------------------------------------------------------------------------
 -- Constants
@@ -60,7 +59,8 @@ local function reset_state()
     correct    = 0,
     wrong      = 0,
     skipped    = 0,
-    corrected  = 0,      -- wrong initially, then practiced successfully
+    corrected  = 0,      -- wrong initially, then entered correctly with the answer shown
+    remediation_error = false,
     -- question list for current session
     questions  = {},
     q_idx      = 1,
@@ -201,7 +201,6 @@ local function open_win()
 end
 
 local function close_win()
-  practice.close()
   if S.win and vim.api.nvim_win_is_valid(S.win) then
     vim.api.nvim_win_close(S.win, true)
   end
@@ -355,8 +354,7 @@ local function render_question()
   table.insert(lines, box_pad .. '└' .. string.rep('─', box_w - 2) .. '┘')
 
   -- Neovim's defaults often have compact historical spellings. Show the
-  -- complete mnemonic explanation directly beside the question, not only
-  -- after a failed answer in the correction tab.
+  -- complete mnemonic explanation directly beside the question.
   if q.explanation then
     table.insert(lines, '')
     for _, explanation_line in ipairs(wrap_text('Why this key: ' .. q.explanation, max_desc_w)) do
@@ -399,6 +397,63 @@ local function render_question()
 end
 
 --------------------------------------------------------------------------------
+-- Phase: CORRECTION PROMPT
+--------------------------------------------------------------------------------
+local function render_remediation()
+  local attempt = S.last_attempt
+  local q = attempt and attempt.question
+  if not q then return end
+
+  local lines, hls_list = {}, {}
+  table.insert(lines, '')
+  render_header(lines, hls_list)
+  table.insert(lines, '')
+  table.insert(lines, pad_center('↺  ENTER THE CORRECT KEY'))
+  hls_list[#hls_list+1] = { #lines - 1, 0, -1, 'NvimGameWrong' }
+  table.insert(lines, '')
+  table.insert(lines, pad_center('You typed:   ' .. (attempt.answer ~= '' and attempt.answer or '(empty)')))
+  hls_list[#hls_list+1] = { #lines - 1, 0, -1, 'NvimGameSubtitle' }
+  table.insert(lines, '')
+
+  local correct_line = pad_center('Correct:     ' .. q.key)
+  table.insert(lines, correct_line)
+  local correct_line_index = #lines - 1
+  local key_start, key_end = find_hl(lines[#lines], q.key)
+  if key_start then
+    local offset = math.floor((W - vim.fn.strdisplaywidth(lines[#lines])) / 2)
+    hls_list[#hls_list+1] = { correct_line_index, offset + key_start, offset + key_end, 'NvimGameKey' }
+  end
+
+  table.insert(lines, '')
+  table.insert(lines, pad_center('Type the displayed key, then press <Enter>.'))
+  hls_list[#hls_list+1] = { #lines - 1, 0, -1, 'NvimGameHint' }
+  if S.remediation_error then
+    table.insert(lines, pad_center('That was not the displayed key. Try again.'))
+    hls_list[#hls_list+1] = { #lines - 1, 0, -1, 'NvimGameWrong' }
+  end
+
+  table.insert(lines, '')
+  local input_display = S.input == '' and '▋' or (S.input .. '▋')
+  table.insert(lines, pad_center('Answer: ' .. input_display))
+  local input_line_index = #lines - 1
+  local input_start = find_hl(lines[#lines], input_display)
+  if input_start then
+    local offset = math.floor((W - vim.fn.strdisplaywidth(lines[#lines])) / 2)
+    hls_list[#hls_list+1] = { input_line_index, offset + input_start, -1, 'NvimGameInput' }
+  end
+
+  table.insert(lines, '')
+  table.insert(lines, DIVIDER)
+  table.insert(lines, pad_center('<Space>=<leader>  <Esc> answer  <Enter> confirm  <C-c> quit'))
+  hls_list[#hls_list+1] = { #lines - 1, 0, -1, 'NvimGameMuted' }
+
+  while #lines < H do table.insert(lines, '') end
+  set_buf(lines)
+  vim.api.nvim_buf_clear_namespace(S.buf, NS, 0, -1)
+  for _, h in ipairs(hls_list) do hl(h[1], h[2], h[3], h[4]) end
+end
+
+--------------------------------------------------------------------------------
 -- Phase: FEEDBACK
 --------------------------------------------------------------------------------
 local function render_feedback()
@@ -430,7 +485,7 @@ local function render_feedback()
     table.insert(lines, pad_center('✓  CORRECTED WITH PROMPT'))
     hls_list[#hls_list+1] = { #lines - 1, 0, -1, 'NvimGameCorrect' }
     table.insert(lines, '')
-    table.insert(lines, pad_center('The correct key was practiced in its example buffer.'))
+    table.insert(lines, pad_center('The shown key was entered correctly.'))
     hls_list[#hls_list+1] = { #lines - 1, 0, -1, 'NvimGameSubtitle' }
   else
     table.insert(lines, pad_center('✗  WRONG'))
@@ -526,7 +581,8 @@ local function render()
   vim.api.nvim_buf_clear_namespace(S.buf, NS, 0, -1)
   if     S.phase == 'menu'     then render_menu()
   elseif S.phase == 'question' then render_question()
-  elseif S.phase == 'remediation' or S.phase == 'feedback' then render_feedback()
+  elseif S.phase == 'remediation' then render_remediation()
+  elseif S.phase == 'feedback' then render_feedback()
   elseif S.phase == 'results'  then render_results()
   end
 end
@@ -558,15 +614,23 @@ local function finish_remediation()
   render()
 end
 
-local function begin_remediation(q, answer)
+local function begin_remediation()
   S.phase = 'remediation'
+  S.input = ''
+  S.remediation_error = false
   render()
-  practice.open(q, {
-    parent_win = S.win,
-    wrong_answer = answer,
-    on_success = finish_remediation,
-    on_abort = close_win,
-  })
+end
+
+local function submit_remediation()
+  local q = S.last_attempt and S.last_attempt.question
+  if not q then return end
+  if vim.trim(S.input) == q.key then
+    finish_remediation()
+    return
+  end
+  S.input = ''
+  S.remediation_error = true
+  render()
 end
 
 local function submit()
@@ -592,12 +656,12 @@ local function submit()
     S.correct    = S.correct + 1
   else
     -- Re-queue it for later unaided recall, but do not advance until the
-    -- foreground exercise has captured the displayed correct sequence.
+    -- player has typed the displayed correct sequence in the game window.
     local requeue_at = math.random(S.q_idx + 1, #S.questions + 1)
     table.insert(S.questions, requeue_at, vim.deepcopy(q))
     S.streak = 0
     S.wrong  = S.wrong + 1
-    begin_remediation(q, answer)
+    begin_remediation()
     return
   end
 
@@ -677,9 +741,20 @@ function M.handle_key(action)
     advance()
 
   elseif S.phase == 'remediation' then
-    -- The exercise owns focus and key capture.  Retain one escape hatch for
-    -- callers that invoke handle_key directly (for example a test harness).
-    if action == '__quit__' then close_win() end
+    if action == '__submit__' then
+      submit_remediation()
+    elseif action == '__bs__' then
+      S.input = capture.backspace(S.input)
+      render()
+    elseif action == '__escape__' then
+      S.input = capture.append(S.input, action)
+      render()
+    elseif action == '__quit__' then
+      close_win()
+    elseif action ~= '__down__' and action ~= '__up__' then
+      S.input = S.input .. action
+      render()
+    end
 
   elseif S.phase == 'results' then
     if action == '__quit__' then

@@ -32,9 +32,9 @@ start()
             └─ <Enter> submits
                  ├─ correct → score + streak → FEEDBACK
                  └─ wrong   → re-insert at random later position
-                      └─ CORRECTION EXERCISE (foreground example buffer)
-                           ├─ shows the correct key and realistic context
-                           ├─ captures that exact sequence without running it
+                      └─ CORRECTION PROMPT (same game window)
+                           ├─ shows the correct key
+                           ├─ player types and submits that exact sequence
                            └─ success → FEEDBACK → any key → QUESTION (next)
                            └─ queue exhausted → RESULTS
                                 ├─ <Enter> → back to MENU
@@ -57,24 +57,13 @@ Wrong and skipped questions are re-inserted at a random index
 early will resurface later in the same session. There is no cross-session
 memory yet (see planned features).
 
-### Correction exercises
+### Correction prompt
 
-Submitting a wrong answer now opens a dedicated Neovim **tab page** with an
-editable source fixture and an information buffer beside it. It renders a
-context for the missed mapping (source, a diagnostic, a Git hunk, an outline,
-a debugger state, and so on) and prominently displays the correct key. The
-user must invoke that exact physical key sequence in the source buffer before
-the game can continue. The expected sequence is a real buffer-local Neovim
-mapping: it opens actual result buffers/splits, moves the cursor, selects text,
-or edits the fixture according to the exercise. These actions remain isolated
-from the user's files, Git index, debugger, and external tools. The tab stays
-open for three seconds after success so the user can inspect the effect before
-the game advances.
-
-`examples.lua` resolves an exercise for every database entry. The 154 curated
-bindings have category-specific fixtures, the optional Compiler Explorer
-bindings have an assembly fixture, and runtime-discovered Neovim defaults are
-given a fixture based on their reported mode.
+Submitting a wrong answer keeps the player in the existing game window. It
+shows the correct key, clears the answer field, and requires that exact key
+sequence to be typed and submitted before the game can continue. No tab,
+fixture, temporary buffer, or editor action is created. The missed question is
+still re-queued for a later unaided recall attempt.
 
 ### Default-key explanations
 
@@ -82,7 +71,7 @@ given a fixture based on their reported mode.
 `v_#-default` and `:cpfile`) into teachable records. Every discovered default
 has a plain-language action, an explanation of its mnemonic, convention, or
 history, and a relevant `:help` topic. The explanation appears in the question
-window and in the correction tab. The complete current-runtime catalog covers
+window before the player answers. The complete current-runtime catalog covers
 the directional `[`/`]` families, LSP, comments, snippets, Visual macros,
 search, insertion, and structural-selection defaults. Where a configured
 mapping shares a physical key in a different mode, both mode-specific lessons
@@ -249,8 +238,6 @@ lua/nvim_game/
   db.lua            built-in keybinding database
   init.lua          game engine + UI + key capture
   input.lua         shared, side-effect-free key token capture
-  examples.lua      contextual correction-exercise catalog
-  practice.lua      foreground correction buffer and gate
   progress.lua      (planned) cross-session SM-2 progress tracker
   scores.lua        (planned) high score / achievement persistence
   discovery.lua     (planned) auto-discover keymaps from vim API
