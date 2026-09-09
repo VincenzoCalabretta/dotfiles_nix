@@ -856,6 +856,16 @@ local function show_impl()
 		end
 	end
 
+	-- Disassembly constantly calls bare CRT/libgcc/libstdc++ runtime symbols
+	-- (`call __cxa_throw@plt`, `call _Znwm@plt`, `jmp _init`, ...) that have
+	-- no compiler-explorer tooltip of their own. Check those last, using the
+	-- raw (non-lowercased) token since these names are case-sensitive.
+	local runtime = require("linker_runtime_help").lookup(token)
+	if runtime then
+		open_preview(runtime.lines)
+		return
+	end
+
 	local subject = mnemonic or normalize_token(token)
 	vim.notify(
 		"Compiler Explorer: no assembly documentation for " .. (subject ~= "" and subject or "this line"),

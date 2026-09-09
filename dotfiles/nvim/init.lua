@@ -19,6 +19,7 @@ require("lazy.lazy")
 require("numconv").setup()
 require("gtags_db").setup()
 require("lsp_fallback").setup()
+require("linker_runtime_help").setup()
 
 
 -- TODO:
