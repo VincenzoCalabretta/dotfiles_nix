@@ -126,6 +126,17 @@ not depend on an untracked host package.
 The Neovim tree is Lua-based and pins its plugin graph in
 `dotfiles/nvim/lazy-lock.json`. Nix supplies LSPs and native build
 dependencies rather than delegating language-server installation to Mason.
+
+Home Manager only deploys `lazy-lock.json` itself — the plugin checkouts
+under lazy.nvim's own data directory (`~/.local/share/nvim/lazy/`) are
+managed by lazy.nvim at runtime, not the Nix store, and `checker.enabled`
+is deliberately off (see `dotfiles/nvim/lua/lazy/lazy.lua`) so lazy.nvim
+never auto-syncs them in the background. That means a bump to
+`lazy-lock.json` — e.g. moving a plugin's pin past a commit that fixed a
+crash — has no effect on an existing checkout until you run `:Lazy
+restore` (or `:Lazy sync`) yourself after activating the new generation;
+until then the old, already-fixed-upstream bug keeps reproducing locally.
+
 Notable local code includes:
 
 - Bazel target navigation and picker integration;
