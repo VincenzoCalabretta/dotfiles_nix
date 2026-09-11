@@ -838,6 +838,20 @@ local function show_impl()
 		return
 	end
 
+	-- Disassembly constantly calls bare CRT/libgcc/libstdc++ runtime symbols
+	-- (`call __cxa_throw@plt`, `call _Znwm@plt`, `jmp _init`, ...) that have
+	-- no compiler-explorer tooltip of their own. These aren't also valid
+	-- instruction mnemonics, so check them before the network tooltip loop
+	-- below -- otherwise the operand's mnemonic (`call`, `jmp`, ...) always
+	-- resolves first and the specific symbol under the cursor is never
+	-- reached. Uses the raw (non-lowercased) token since these names are
+	-- case-sensitive.
+	local runtime = require("linker_runtime_help").lookup(token)
+	if runtime then
+		open_preview(runtime.lines)
+		return
+	end
+
 	local mnemonic = M.mnemonic(line)
 	for _, candidate in ipairs(instruction_candidates(token, mnemonic)) do
 		local ok, response = pcall(require("compiler-explorer.rest").tooltip_get, architecture, candidate)
@@ -854,16 +868,6 @@ local function show_impl()
 			)
 			return
 		end
-	end
-
-	-- Disassembly constantly calls bare CRT/libgcc/libstdc++ runtime symbols
-	-- (`call __cxa_throw@plt`, `call _Znwm@plt`, `jmp _init`, ...) that have
-	-- no compiler-explorer tooltip of their own. Check those last, using the
-	-- raw (non-lowercased) token since these names are case-sensitive.
-	local runtime = require("linker_runtime_help").lookup(token)
-	if runtime then
-		open_preview(runtime.lines)
-		return
 	end
 
 	local subject = mnemonic or normalize_token(token)
