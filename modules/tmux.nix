@@ -11,7 +11,7 @@
   ];
 
   xdg.configFile."tmux/tmux.conf".text = ''
-    set-option -g default-shell ${pkgs.zsh}/bin/zsh
+    set-option -g default-shell ${pkgs.bash}/bin/bash
   '' + builtins.readFile ../dotfiles/tmux/tmux.conf;
 
   xdg.configFile."tmux/tmux_i3_like.conf".source =

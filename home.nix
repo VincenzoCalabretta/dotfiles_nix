@@ -11,7 +11,6 @@
   imports = [
     ./modules/tmux.nix
     ./modules/nvim.nix
-    ./modules/zsh.nix
     ./modules/bash.nix
     ./modules/lf.nix
     ./modules/i3.nix
@@ -41,7 +40,7 @@
 
   programs.home-manager.enable = true;
 
-  # Home-manager sets up the zsh hook and pulls in nix-direnv automatically.
+  # Home-manager sets up the shell hook and pulls in nix-direnv automatically.
   programs.direnv = {
     enable = true;
     nix-direnv.enable = true;
@@ -75,7 +74,7 @@
     nerd-fonts.fira-code
 
     # Misc tools referenced from aliases or scripts
-    highlight           # ccat alias in aliases.zsh
+    highlight           # ccat alias in aliases.bash
     imagemagick          # import, convert, mogrify, etc.
 
     # Dev toolchain — required by nvim LSPs and general use

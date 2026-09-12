@@ -58,7 +58,7 @@
     isNormalUser = true;
     description = "v";
     extraGroups = [ "networkmanager" "wheel" ];
-    shell = pkgs.zsh;
+    shell = pkgs.bash;
   };
 
   nixpkgs.config.allowUnfree = true;
@@ -72,7 +72,6 @@
 
   services.openssh.enable = true;
 
-  programs.zsh.enable = true;
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
   # wg1 (/etc/wireguard/wg1.conf) starts at boot.  wg3

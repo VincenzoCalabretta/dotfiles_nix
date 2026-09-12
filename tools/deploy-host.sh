@@ -35,8 +35,8 @@ if [[ -z "${SKIP_HOME:-}" ]]; then
 fi
 
 if [[ -z "${NO_SHELL:-}" ]]; then
-  if [[ "${SHELL}" != *zsh ]]; then
-    echo "[deploy-host] Setting default shell to zsh …"
+  if [[ "${SHELL}" != *bash ]]; then
+    echo "[deploy-host] Setting default shell to bash …"
     nix run "${FLAKE}#set-default-shell" || true
   fi
 fi

@@ -1,5 +1,5 @@
 font-size = 8
 theme = TokyoNight Night
 class = ghostty
-command = zsh
+command = bash
 window-decoration = false

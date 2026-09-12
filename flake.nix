@@ -1,5 +1,5 @@
 {
-  description = "Generic, reusable NixOS/Home Manager module library (tmux, nvim, zsh, lf, i3, Rust, WireGuard, ...) — no personal packages, secrets, or private infrastructure. Concrete personal deployments (hosts, private local-AI stack) live in a separate private overlay repo that imports this one.";
+  description = "Generic, reusable NixOS/Home Manager module library (tmux, nvim, bash, lf, i3, Rust, WireGuard, ...) — no personal packages, secrets, or private infrastructure. Concrete personal deployments (hosts, private local-AI stack) live in a separate private overlay repo that imports this one.";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -63,10 +63,10 @@
       packages.${system} = {
         compiler-explorer = pkgs.callPackage ./packages/compiler-explorer.nix { };
 
-        # Set the login shell to zsh: `nix run .#set-default-shell`
+        # Set the login shell to bash: `nix run .#set-default-shell`
         set-default-shell =
           pkgs.writeShellScriptBin "set-default-shell" ''
-            exec chsh -s "$(command -v zsh)"
+            exec chsh -s "$(command -v bash)"
           '';
 
         # Single-stop deploy: nixos-rebuild switch + home-manager + shell

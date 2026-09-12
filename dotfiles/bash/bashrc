@@ -1,10 +1,6 @@
-# Bash counterpart to ../zsh/zshrc — same prompt, history, vi-mode, and
-# aliases, adapted to bash's readline/ble.sh instead of zsh's ZLE.
-
 # ble.sh must be sourced as close to the top of .bashrc as possible (its own
-# requirement). It's the closest bash analogue to zsh-autosuggestions +
-# zsh-syntax-highlighting combined (both come from one package), and also
-# provides the vi keymap used below in place of zsh-vi-mode.
+# requirement). It provides autosuggestions, syntax highlighting, and the vi
+# keymap used below, all from one package.
 # ble.sh's own install dir (~/.config/bash/blesh) is a symlink into the
 # read-only Nix store, so it can't hold ble.sh's cache; make sure
 # XDG_CACHE_HOME exists first so ble.sh picks that writable location instead
@@ -14,15 +10,17 @@ if [[ $- == *i* ]]; then
     source "$HOME/.config/bash/blesh/ble.sh" --noattach
 fi
 
-# ---- From the Backup (mirrors zshrc's history block) ----
+# ---- From the Backup ----
 HISTFILE=~/.histfile
 HISTSIZE=1000000
 HISTFILESIZE=1000000
-# Shared with zsh's HISTFILE above, across many terminals — never truncate it.
+# Never truncate the shared history file.
 shopt -s histappend
 shopt -s autocd
-# Closest bash analogue to zsh's extendedglob (different syntax, same idea:
-# richer glob patterns than the POSIX default).
+# Flush/reload history after every prompt so concurrent bash sessions see
+# each other's commands live, instead of only at shell exit.
+PROMPT_COMMAND='history -a; history -c; history -r'${PROMPT_COMMAND:+"; $PROMPT_COMMAND"}
+# Richer glob patterns than the POSIX default (?(), *(), +(), @(), !()).
 shopt -s extglob
 
 # Programmable completion (bash's compinit equivalent) — symlinked in by
@@ -51,13 +49,12 @@ bleopt default_keymap=vi 2>/dev/null
 # would otherwise sit stale until the next new command line).
 bleopt keymap_vi_mode_update_prompt=1 2>/dev/null
 
-# Trailing `$` color reflects vi mode: green in insert, red in normal —
-# mirrors zshrc's VIM_PROMPT_COLOR/zle-keymap-select trick. ble.sh's prompt
-# engine re-evaluates custom \q{...} escapes on every keystroke (like zsh's
-# ZLE + PROMPT_SUBST), so — unlike plain readline, which can only splice a
-# mode indicator before the *last line* of PS1 — this can sit inline and
-# still update live. See ble.sh's own contrib/prompt-vim-mode.bash, which
-# this mirrors but emits a color instead of "(ins)"/"(cmd)" text.
+# Trailing `$` color reflects vi mode: green in insert, red in normal.
+# ble.sh's prompt engine re-evaluates custom \q{...} escapes on every
+# keystroke, so — unlike plain readline, which can only splice a mode
+# indicator before the *last line* of PS1 — this can sit inline and still
+# update live. See ble.sh's own contrib/prompt-vim-mode.bash, which this
+# mirrors but emits a color instead of "(ins)"/"(cmd)" text.
 function ble/prompt/backslash:v/vi-mode-color {
     local mode; ble/keymap:vi/script/get-mode
     case $mode in
@@ -123,12 +120,13 @@ PERL_MM_OPT="INSTALL_BASE=/home/v/perl5"; export PERL_MM_OPT;
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 
-# Aliases and functions are shell-agnostic, so bash reuses zsh's copy
-# directly instead of maintaining a duplicate that could drift out of sync.
-[[ -r "$HOME/.config/zsh/custom/aliases.zsh" ]] &&
-    source "$HOME/.config/zsh/custom/aliases.zsh"
+[[ -r "$HOME/.config/bash/custom/aliases.bash" ]] &&
+    source "$HOME/.config/bash/custom/aliases.bash"
 
 source "$HOME/.config/bash/custom/quote_highlighting.bash"
+source "$HOME/.config/bash/custom/dir_utils.bash"
+source "$HOME/.config/bash/custom/bazel_aliases.bash"
+source "$HOME/.config/bash/custom/git_aliases.bash"
 
 # opencode
 export PATH=/home/v/.opencode/bin:$PATH

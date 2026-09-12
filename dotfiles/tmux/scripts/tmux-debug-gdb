@@ -50,10 +50,10 @@ tmux kill-session -t dbg
 
 make all 2>&1 | grep --color=always -E 'Error|error|$'
 
-tmux new-session -d -s dbg -n gdbp "/usr/bin/zsh -c \"make gdb_host_r5 \""
-tmux split-window -h -t dbg:gdbp '/usr/bin/zsh -c "touch uart_host.log && tail -f uart_host.log;read"'
-tmux split-window -v -t dbg:gdbp '/usr/bin/zsh -c "touch uart_remote.log && tail -f uart_remote.log;read"'
-tmux new-window -n qemu -t dbg:0 "/usr/bin/zsh -c \"make qemu \""
+tmux new-session -d -s dbg -n gdbp "/usr/bin/bash -c \"make gdb_host_r5 \""
+tmux split-window -h -t dbg:gdbp '/usr/bin/bash -c "touch uart_host.log && tail -f uart_host.log;read"'
+tmux split-window -v -t dbg:gdbp '/usr/bin/bash -c "touch uart_remote.log && tail -f uart_remote.log;read"'
+tmux new-window -n qemu -t dbg:0 "/usr/bin/bash -c \"make qemu \""
 tmux select-pane -t gdbp.0
 
 tmux select-window -t dbg:gdbp

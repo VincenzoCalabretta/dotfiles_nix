@@ -18,9 +18,9 @@ infrastructure.
 
 | Output | Purpose |
 |---|---|
-| `homeManagerModules.base` | Generic Home Manager profile: tmux, Neovim, zsh, bash, `lf`, i3, ghostty, Rust. |
+| `homeManagerModules.base` | Generic Home Manager profile: tmux, Neovim, bash, `lf`, i3, ghostty, Rust. |
 | `homeConfigurations.example` | `base` under a placeholder identity — proves it activates with zero private inputs reachable. |
-| `nixosModules.nixos-base` | Shared NixOS baseline (unfree packages, flakes enabled, zsh, OpenSSH). |
+| `nixosModules.nixos-base` | Shared NixOS baseline (unfree packages, flakes enabled, OpenSSH). |
 | `nixosModules.wireguard` | Opt-in `wg-quick` interfaces, config files outside the Nix store. |
 | `nixosModules.forgejo-runner` | Opt-in host-executed Forgejo Actions runner. |
 | `nixosModules.nvidia` | Opt-in hybrid Intel/NVIDIA PRIME-offload configuration. |
@@ -29,7 +29,7 @@ infrastructure.
 | `nixosModules.compiler-explorer` | Opt-in self-hosted Compiler Explorer service. |
 | `packages.deploy-host` | Build, switch, and activate Home Manager for any flake via `--flake`. |
 | `packages.capture-host` | Snapshot live `/etc/nixos` state into a host directory. |
-| `packages.set-default-shell` | Set the login shell to zsh. |
+| `packages.set-default-shell` | Set the login shell to bash. |
 | `checks.*` | Home Manager build, deployment tools, and NixOS/Neovim tests — see [Testing](#testing). |
 
 x86_64-Linux only. `deploy-host`/`capture-host` take `--flake <path>`, so a
@@ -46,7 +46,7 @@ consumer reuses them instead of redefining its own build/switch tooling.
 ├── modules/                   # one file per NixOS/Home Manager module
 ├── dotfiles/
 │   ├── nvim/                  # Lua config, DAP, LSP, pickers, GDB helpers
-│   ├── tmux/, zsh/, bash/     # shell and multiplexer config
+│   ├── tmux/, bash/           # shell and multiplexer config
 │   └── i3/, ghostty/, lf/     # desktop/terminal/file-manager config
 ├── tools/                     # deploy-host.sh, capture-host.sh
 ├── tests/                     # NixOS VM and Neovim plugin tests
