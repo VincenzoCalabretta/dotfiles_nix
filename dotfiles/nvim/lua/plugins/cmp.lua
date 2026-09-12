@@ -40,6 +40,9 @@ return {
       local cmp = require 'cmp'
       local luasnip = require 'luasnip'
       luasnip.config.setup {}
+      -- User-defined snippets: lua/snippets/<filetype>.lua, lua/snippets/all.lua
+      -- for global ones. See https://github.com/L3MON4D3/LuaSnip/blob/master/DOC.md#lua
+      require('luasnip.loaders.from_lua').load { paths = vim.fn.stdpath 'config' .. '/lua/snippets' }
 
       cmp.setup {
         snippet = {
