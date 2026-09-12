@@ -14,7 +14,7 @@ return {
       -- profile/machine where these aren't installed yet; a no-op after.
       local ensure_installed = {
         'bash', 'c', 'cpp', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'vim', 'vimdoc',
-        'mlir', 'tablegen'
+        'mlir', 'tablegen', 'llvm'
       }
       local installed = ts_config.get_installed('parsers')
       local missing = vim.tbl_filter(function(lang)
