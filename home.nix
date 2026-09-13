@@ -17,6 +17,7 @@
     ./modules/ghostty.nix
     ./modules/rust.nix
     ./modules/bazel.nix
+    ./modules/tlaplus.nix
     ./modules/neutral-process-name.nix
   ];
 
