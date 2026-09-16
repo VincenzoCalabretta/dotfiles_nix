@@ -36,6 +36,9 @@
     # Browsers / mail — exec'd from i3; move to system config if preferred
     firefox
     thunderbird
+
+    # Image editing
+    gimp
   ];
 
   xdg.configFile."i3".source = ../dotfiles/i3;
