@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+
+# Open a new tmux window for every terminal. The first terminal starts its
+# own session; later terminals join the most recently used attached session
+# and select a newly created Bash window there.
+set -euo pipefail
+
+if ! tmux has-session 2>/dev/null; then
+    exec tmux new-session "exec ${BASH:-bash} -l"
+fi
+
+most_recent_session() {
+    local attached_only=$1
+    local name attached activity
+    local newest=-1
+    local selected=""
+
+    while IFS=$'\t' read -r name attached activity; do
+        if (( attached_only && ! attached )); then
+            continue
+        fi
+
+        if (( activity > newest )); then
+            newest=$activity
+            selected=$name
+        fi
+    done < <(tmux list-sessions -F $'#{session_name}\t#{session_attached}\t#{session_activity}')
+
+    printf '%s\n' "$selected"
+}
+
+session=$(most_recent_session 1)
+if [[ -z $session ]]; then
+    session=$(most_recent_session 0)
+fi
+
+if [[ -z $session ]]; then
+    exec tmux new-session "exec ${BASH:-bash} -l"
+fi
+
+# Do not depend on the already-running server having reloaded its tmux
+# configuration: existing servers can retain an older empty default-command.
+# Explicitly start a login Bash so it reads ~/.bash_profile, which then loads
+# the interactive ~/.bashrc configuration.
+tmux new-window -t "$session" "exec ${BASH:-bash} -l"
+exec tmux attach-session -t "$session"

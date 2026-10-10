@@ -2,10 +2,51 @@ if [ -f "$HOME/.nix-profile/etc/profile.d/hm-session-vars.sh" ]; then
     . "$HOME/.nix-profile/etc/profile.d/hm-session-vars.sh"
 fi
 
-export PATH=$HOME/bin:/usr/local/bin:$PATH
-export PATH="$PATH:$HOME/.cargo/bin"
-export PATH="$PATH:$HOME/julia-1.10.1/bin/"
-export PATH="$PATH:/tools/Xilinx/Vitis/2022.1/bin"
+_v_path_prepend() {
+    local entry=$1
+    case ":${PATH-}:" in
+    *":${entry}:"*) ;;
+    *) PATH="${entry}${PATH:+:${PATH}}" ;;
+    esac
+    export PATH
+}
+
+_v_path_append() {
+    local entry=$1
+    case ":${PATH-}:" in
+    *":${entry}:"*) ;;
+    *) PATH="${PATH:+${PATH}:}${entry}" ;;
+    esac
+    export PATH
+}
+
+_v_path_deduplicate() {
+    local entry result='' have_entry='' empty_seen=''
+    local -a entries
+    local -A seen=()
+    IFS=: read -r -a entries <<< "${PATH-}"
+    for entry in "${entries[@]}"; do
+        if [[ -z $entry ]]; then
+            [[ $empty_seen ]] && continue
+            empty_seen=1
+        elif [[ ${seen[$entry]+set} ]]; then
+            continue
+        else
+            seen[$entry]=1
+        fi
+        result+="${have_entry:+:}${entry}"
+        have_entry=1
+    done
+    PATH=$result
+    export PATH
+}
+
+_v_path_deduplicate
+_v_path_prepend /usr/local/bin
+_v_path_prepend "$HOME/bin"
+_v_path_append "$HOME/.cargo/bin"
+_v_path_append "$HOME/julia-1.10.1/bin/"
+_v_path_append /tools/Xilinx/Vitis/2022.1/bin
 
 # Real Vivado/Vitis 2023.2 install (see ~/opt/vitis/{Vivado,Vitis}/2023.2).
 # Consumed by the zub_1cg flake's xsct/vivado FHS wrappers, which refuse to
@@ -13,4 +54,11 @@ export PATH="$PATH:/tools/Xilinx/Vitis/2022.1/bin"
 export XILINX_ROOT="$HOME/opt/vitis"
 
 # Created by `pipx` on 2026-06-14 20:35:39
-export PATH="$PATH:/home/v/.local/bin"
+_v_path_append "$HOME/.local/bin"
+
+# Login shells read this file instead of .bashrc. Source the interactive
+# configuration as well so tmux's login shells get aliases, ble.sh, and the
+# prompt setup.
+if [[ $- == *i* && -r "$HOME/.bashrc" ]]; then
+    . "$HOME/.bashrc"
+fi

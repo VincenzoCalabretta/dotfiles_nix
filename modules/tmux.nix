@@ -12,6 +12,7 @@
 
   xdg.configFile."tmux/tmux.conf".text = ''
     set-option -g default-shell ${pkgs.bash}/bin/bash
+    set-option -g default-command "exec ${pkgs.bash}/bin/bash -l"
   '' + builtins.readFile ../dotfiles/tmux/tmux.conf;
 
   xdg.configFile."tmux/tmux_i3_like.conf".source =

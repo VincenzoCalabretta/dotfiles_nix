@@ -32,7 +32,7 @@
 #
 #   dotfiles.neutralProcessName = {
 #     enable = true;
-#     name = "wrk";
+#     name = "neutral-tool";
 #     package = pkgs.codex;
 #     sourceCommand = "codex";
 #     extraRuntimePackages = [ pkgs.ripgrep pkgs.bubblewrap ];
@@ -97,7 +97,6 @@ in
 
     name = lib.mkOption {
       type = lib.types.str;
-      default = "wrk";
       description = ''
         Neutral command name installed on PATH, and the visible process name:
         argv[0] (ps aux / pgrep -a) becomes this, and the kernel comm

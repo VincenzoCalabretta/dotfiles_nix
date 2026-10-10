@@ -1,5 +1,5 @@
 font-size = 8
 theme = TokyoNight Night
 class = ghostty
-command = bash
+command = tmux-new-terminal
 window-decoration = false

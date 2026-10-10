@@ -29,6 +29,14 @@
   # on PATH so config files can invoke them by bare name.
   home.sessionPath = [ "${config.home.homeDirectory}/.config/tmux/scripts" ];
 
+  # Keep every program that honors the standard editor variables on Neovim,
+  # including GUI sessions and remote/login shells that source Home Manager's
+  # session variables.
+  home.sessionVariables = {
+    EDITOR = "nvim";
+    VISUAL = "nvim";
+  };
+
   # The X session here is started manually via `startx`/xinit (no display
   # manager), so nothing else sources home-manager's session-vars script —
   # home.sessionPath above would silently never reach i3, ghostty, or the

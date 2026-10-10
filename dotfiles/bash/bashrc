@@ -17,9 +17,15 @@ HISTFILESIZE=1000000
 # Never truncate the shared history file.
 shopt -s histappend
 shopt -s autocd
-# Flush/reload history after every prompt so concurrent bash sessions see
-# each other's commands live, instead of only at shell exit.
-PROMPT_COMMAND='history -a; history -c; history -r'${PROMPT_COMMAND:+"; $PROMPT_COMMAND"}
+# ble.sh shares history incrementally when available (configured below). Keep
+# the standard Bash fallback incremental too: never clear and reload the
+# whole history list at every prompt.
+if [[ ! ${BLE_VERSION-} ]]; then
+    case ${PROMPT_COMMAND-} in
+    *'history -a; history -n'*) ;;
+    *) PROMPT_COMMAND='history -a; history -n'${PROMPT_COMMAND:+"; $PROMPT_COMMAND"} ;;
+    esac
+fi
 # Richer glob patterns than the POSIX default (?(), *(), +(), @(), !()).
 shopt -s extglob
 
@@ -42,12 +48,22 @@ set -o vi
 # vi-mode-color prompt function's first call errors with "No such file or
 # directory" (calling a not-yet-defined function whose name contains
 # slashes), both surviving only because they're wrapped in `2>/dev/null`.
-ble-import lib/keymap.vi.sh
-bleopt default_keymap=vi 2>/dev/null
+if [[ ${BLE_VERSION-} ]]; then
+    ble-import lib/keymap.vi.sh
+    bleopt default_keymap=vi
+    # Let ble.sh append commands and import only entries added by other
+    # sessions. This avoids the full history clear/reload on every prompt.
+    bleopt history_share=1
+    # Wait briefly after typing stops before generating history and syntax
+    # suggestions. The 1 ms default competes with normal editing on every key.
+    bleopt complete_auto_delay=150
+fi
 # Off by default: without it, ble.sh only redraws its separate "-- INSERT --"
 # status line on a vi mode change, not the PS1 prompt itself (\q{...} below
 # would otherwise sit stale until the next new command line).
-bleopt keymap_vi_mode_update_prompt=1 2>/dev/null
+if [[ ${BLE_VERSION-} ]]; then
+    bleopt keymap_vi_mode_update_prompt=1
+fi
 
 # Trailing `$` color reflects vi mode: green in insert, red in normal.
 # ble.sh's prompt engine re-evaluates custom \q{...} escapes on every
@@ -88,28 +104,60 @@ function ble/prompt/backslash:v/vi-mode-multiline-hint {
 # ble.sh fails to attach (e.g. no TTY); overwritten below once it does.
 PS1='\[\033[1;37m\][$(_v_git_branch)] \[\033[0;34m\]\w\[\033[0m\] \[\033[1;32m\]\$\[\033[0m\] '
 
-# variables to make RANGER open files with the correct editor
-export VISUAL=nvim
-export EDITOR=nvim
-
 # ---- End from the Backup ----
 
-# Preferred editor for local and remote sessions
-if [[ -n $SSH_CONNECTION ]]; then
-    export EDITOR='vim'
-else
-    export EDITOR='nvim'
+if ! declare -F _v_path_prepend &>/dev/null; then
+    _v_path_prepend() {
+        local entry=$1
+        case ":${PATH-}:" in
+        *":${entry}:"*) ;;
+        *) PATH="${entry}${PATH:+:${PATH}}" ;;
+        esac
+        export PATH
+    }
+
+    _v_path_append() {
+        local entry=$1
+        case ":${PATH-}:" in
+        *":${entry}:"*) ;;
+        *) PATH="${PATH:+${PATH}:}${entry}" ;;
+        esac
+        export PATH
+    }
+
+    _v_path_deduplicate() {
+        local entry result='' have_entry='' empty_seen=''
+        local -a entries
+        local -A seen=()
+        IFS=: read -r -a entries <<< "${PATH-}"
+        for entry in "${entries[@]}"; do
+            if [[ -z $entry ]]; then
+                [[ $empty_seen ]] && continue
+                empty_seen=1
+            elif [[ ${seen[$entry]+set} ]]; then
+                continue
+            else
+                seen[$entry]=1
+            fi
+            result+="${have_entry:+:}${entry}"
+            have_entry=1
+        done
+        PATH=$result
+        export PATH
+    }
 fi
 
+_v_path_deduplicate
+
 # Add .NET Core SDK tools
-export PATH="$PATH:/home/v/.dotnet/tools"
+_v_path_append "$HOME/.dotnet/tools"
 
 # >>> juliaup initialize >>>
 # !! Contents within this block are managed by juliaup !!
-export PATH="/home/v/.juliaup/bin:$PATH"
+_v_path_prepend "$HOME/.juliaup/bin"
 # <<< juliaup initialize <<<
 
-PATH="/home/v/perl5/bin${PATH:+:${PATH}}"; export PATH;
+_v_path_prepend "$HOME/perl5/bin"
 PERL5LIB="/home/v/perl5/lib/perl5${PERL5LIB:+:${PERL5LIB}}"; export PERL5LIB;
 PERL_LOCAL_LIB_ROOT="/home/v/perl5${PERL_LOCAL_LIB_ROOT:+:${PERL_LOCAL_LIB_ROOT}}"; export PERL_LOCAL_LIB_ROOT;
 PERL_MB_OPT="--install_base \"/home/v/perl5\""; export PERL_MB_OPT;
@@ -118,7 +166,7 @@ PERL_MM_OPT="INSTALL_BASE=/home/v/perl5"; export PERL_MM_OPT;
 # bun (bun's zsh completion at ~/.bun/_bun isn't bash-compatible; run
 # `bun completions` from a bash session to generate/wire the bash one)
 export BUN_INSTALL="$HOME/.bun"
-export PATH="$BUN_INSTALL/bin:$PATH"
+_v_path_prepend "$BUN_INSTALL/bin"
 
 [[ -r "$HOME/.config/bash/custom/aliases.bash" ]] &&
     source "$HOME/.config/bash/custom/aliases.bash"
@@ -129,7 +177,7 @@ source "$HOME/.config/bash/custom/bazel_aliases.bash"
 source "$HOME/.config/bash/custom/git_aliases.bash"
 
 # opencode
-export PATH=/home/v/.opencode/bin:$PATH
+_v_path_prepend "$HOME/.opencode/bin"
 
 # Switch to the dynamic vi-mode-colored prompt whenever ble.sh was sourced —
 # set *before* attaching, since ble.sh parses/caches PS1 as of attach time

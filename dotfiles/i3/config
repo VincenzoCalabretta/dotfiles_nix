@@ -154,7 +154,7 @@ bar {
 # ------------------------------------------
 # CUSTOM WORKSPACE assignments
 # ------------------------------------------
-exec ghostty -e tmux
+exec ghostty
 assign [class="ghostty"] 2
 exec --no-startup-id firefox
 assign [class="firefox"] 3
