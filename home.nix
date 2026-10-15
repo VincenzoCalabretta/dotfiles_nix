@@ -18,7 +18,6 @@
     ./modules/rust.nix
     ./modules/bazel.nix
     ./modules/tlaplus.nix
-    ./modules/neutral-process-name.nix
   ];
 
   # Match the release you're installing home-manager from. Update in lockstep
@@ -48,6 +47,15 @@
   '';
 
   programs.home-manager.enable = true;
+
+  # Include installed packages' manual pages and index them for man -k/apropos.
+  programs.man = {
+    enable = true;
+    generateCaches = true;
+  };
+  # Home Manager includes "man" automatically; library/API pages may live in
+  # a separate "devman" output.
+  home.extraOutputsToInstall = [ "devman" ];
 
   # Home-manager sets up the shell hook and pulls in nix-direnv automatically.
   programs.direnv = {
@@ -91,6 +99,10 @@
     gnumake
     pkg-config           # locates library compile/link flags for builds
     git
+
+    # Linux system calls, libc interfaces, and POSIX commands/API references.
+    man-pages
+    man-pages-posix
   ];
 
   fonts.fontconfig.enable = true;
