@@ -49,6 +49,14 @@ return {
         builtin.keymaps { modes = { 'n', 'i', 'c', 'x', 'o', 's' } }
       end, { desc = '[S]earch [K]eymaps (including Neovim defaults)' })
       vim.keymap.set('n', '<leader>sf', builtin.find_files, { desc = '[S]earch [F]iles' })
+      -- Build directories can ignore every file; keep an explicit unfiltered search.
+      vim.keymap.set('n', '<leader>sF', function()
+        builtin.find_files {
+          hidden = true,
+          no_ignore = true,
+          find_command = { 'rg', '--files', '--color', 'never', '--glob', '!.git' },
+        }
+      end, { desc = '[S]earch all [F]iles (including hidden and ignored)' })
       vim.keymap.set('n', '<leader>ss', builtin.builtin, { desc = '[S]earch [S]elect Telescope' })
       vim.keymap.set('n', '<leader>sw', builtin.grep_string, { desc = '[S]earch current [W]ord' })
       vim.keymap.set('n', '<leader>sg', builtin.live_grep, { desc = '[S]earch by [G]rep' })
